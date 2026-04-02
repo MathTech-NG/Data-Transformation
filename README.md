@@ -1,183 +1,353 @@
-# Academic Performance Data Pipeline
-### Regression & Time Series Modelling of Students' Performance Across Semesters
+# Academic Performance Dataset — Variable Synthesis
+
+**Project:** Regression and Time Series Modelling of Students' Performance Across Semester  
+**Author:** Ehime Kelvin Ehinomen, Mountain Top University (Jan 2026)  
+**Data engineering:** `enrich.py` / `verify.py`
 
 ---
 
-## What This Is
+## Table of Contents
 
-This project is trying to answer one question: **can we look at how a student performed in their early years and predict — or at least explain — where they end up by the time they graduate?**
-
-To do that, we need our data to be in the right shape. Raw data straight from the source is rarely model-ready. This pipeline takes the raw academic performance dataset and runs it through three stages: check it, reshape it, then verify that the reshaping didn't break anything or quietly introduce nonsense.
-
-The dataset has **3,046 students** across multiple departments and year groups (2010–2014), with CGPA recorded per year level (100L through 400L) plus a final SGPA.
-
----
-
-## The Three Stages
-
----
-
-### Stage 1 — Look at What You Have (Pre-Transformation Diagnostics)
-
-Before touching anything, you want to understand the shape and character of the data. This isn't busywork — if you skip it and something goes wrong in the model later, you won't know if it was the data's fault or yours.
-
-**What we check:**
-
-**Descriptive statistics** — the basics. What's the average CGPA at each level? What's the lowest and highest? How spread out are the scores? This gives you a feel for whether the data makes sense at all. For example, if someone's CGPA100 was 6.0 on a 5-point scale, that's a red flag you'd catch here.
-
-**Skewness and Kurtosis** — these two tell you about the *shape* of the score distribution. Skewness tells you whether scores are bunching up on the high or low end. Kurtosis tells you whether the distribution is flat and spread out or sharply peaked in the middle. Why does this matter? Because the regression model we're building has an assumption baked into it — that errors in prediction follow a roughly bell-shaped pattern. If our data is wildly lopsided, we need to know upfront so we can account for it.
-
-Our data came back with mild negative skew across all year levels, meaning slightly more students score above average than below. Not dramatic. No corrections needed, but good to document.
-
-**Normality test** — we ran a formal test (Shapiro-Wilk) to check whether each year's GPA distribution follows a normal bell curve. None of them passed strictly, which is honest — real-world GPA data rarely does. But the departures from normality were mild, and at 3,000+ students, the model is robust enough to handle it.
-
-**Correlation matrix** — this shows how strongly each year's CGPA is related to the others. The short answer: strongly. CGPA200 and CGPA300 are almost interchangeable in terms of what they predict about final CGPA. This is useful information — it tells us which years carry the most weight in predicting the final outcome.
+1. [Background](#1-background)
+2. [Source Dataset](#2-source-dataset)
+3. [The Modelling Gap](#3-the-modelling-gap)
+4. [Synthesis Strategy](#4-synthesis-strategy)
+5. [Variable Rationale](#5-variable-rationale)
+   - 5.1 Previous GPA
+   - 5.2 Attendance Rate
+   - 5.3 Study Hours Per Week
+   - 5.4 Course Load
+6. [Mathematical Foundations](#6-mathematical-foundations)
+7. [Programme-to-Code Mapping](#7-programme-to-code-mapping)
+8. [Reproducibility](#8-reproducibility)
+9. [Limitations and Honest Caveats](#9-limitations-and-honest-caveats)
+10. [Running the Scripts](#10-running-the-scripts)
+11. [Output Schema](#11-output-schema)
 
 ---
 
-### Stage 2 — Reshape the Data (Transformation)
+## 1. Background
 
-The raw dataset has CGPA as a snapshot per year level. The model needs more than snapshots — it needs structure that captures *movement over time*. Here's what we built:
+The project applies regression analysis and time-series modelling to academic records to predict students' CGPA trajectories, identify at-risk students early, and support evidence-based academic planning.
 
-**Lag Features**
+The model specification requires five variables:
 
-This is the most important transformation. A lag feature is just: *what was this student's GPA the year before?*
-
-- Lag1 = CGPA100 (what they scored entering 200L)
-- Lag2 = CGPA200 (what they scored entering 300L)
-- Lag3 = CGPA300 (what they scored entering 400L)
-
-Why does this matter? Because "previous performance predicts future performance" is the core claim of the entire project. The lag feature *is* that claim, made concrete. Without it, you're not doing time series modelling — you're just doing regular regression on snapshots.
-
-**Delta Features**
-
-These capture the *change* between levels:
-
-- Delta_100_200 = CGPA200 minus CGPA100 (did they improve or decline from 100L to 200L?)
-- Delta_200_300 = same idea
-- Delta_300_400 = same idea
-
-A student who goes from 2.5 to 3.8 between 100L and 200L is telling you something different from a student who goes from 4.2 to 3.1. The delta captures that story.
-
-**Z-score Normalization**
-
-All the GPA columns — original, lag, and delta — get rescaled so they're centered at zero with a consistent spread. The actual GPA values become: *how far is this student from the average, measured in standard deviations?*
-
-A score of +1.5 means "1.5 standard deviations above average." A score of -0.8 means "below average but not drastically so."
-
-This matters because regression models work better when all your variables are on the same scale. Without normalization, a variable that ranges from 1.5 to 5.0 will unfairly dominate a variable that ranges from 0 to 1, even if they're equally important. Normalization levels the playing field.
-
-**Gender Encoding**
-
-Gender (Male/Female) gets converted to (1/0) so the model can use it numerically. Simple, necessary, standard.
-
-**Programme Code and Year of Graduation** are left as text — they're useful for slicing and analyzing results by group, but they're not fed directly into the model.
-
----
-
-### Stage 3 — Verify That Nothing Broke (Post-Transformation Checks)
-
-Transformation always carries risk. You might accidentally introduce patterns that weren't in the original data, or create features that are so similar to each other that the model gets confused. Stage 3 is how you catch that.
-
-**VIF (Variance Inflation Factor)**
-
-This checks whether any of your features are *too similar* to each other. If two features carry almost identical information, the model can't tell them apart and starts behaving unpredictably.
-
-Scale: 1 is perfect, anything under 5 is fine, above 10 is a problem.
-
-Our results:
-- CGPA100: 2.03 ✓
-- CGPA200: 3.57 ✓
-- CGPA300: 3.86 ✓
-- CGPA400: 3.18 ✓
-
-All under 5. The features are related (as expected — they're all GPA) but not so related that they cancel each other out. We're good.
-
-**Mutual Information (Feature Relevance)**
-
-This measures how much each feature actually *knows* about the thing we're trying to predict (final CGPA). Think of it as asking: if I told you only this one number, how much would it tell you about where this student ended up?
-
-Scale: 0 = tells you nothing, 1+ = highly informative.
-
-Our results:
-- CGPA100 / Lag1: ~0.53 (moderate — early performance has some signal but not everything)
-- CGPA200 / Lag2: ~0.90 (high — second year performance is a strong predictor)
-- CGPA300 / Lag3: ~0.90 (high — same)
-- CGPA400: ~0.79 (high)
-
-This is a meaningful finding: **200L and 300L performance are the strongest predictors of final CGPA**. 100L matters but less so — students often arrive unsettled and find their footing later. This is worth mentioning in the project discussion.
-
-**Eigenvalue Analysis (Stability Check)**
-
-This is a structural check on the relationship between all features taken together. Without getting into the linear algebra, we're checking: is there any direction in the data where the features completely collapse into each other?
-
-The condition number came out at **18.62**. Think of it as a stability score — under 30 is stable, 30–100 is borderline, above 100 means the model will be fragile and easily broken by small changes in the data.
-
-18.62 is comfortable. The feature set is structurally sound.
-
-**Baseline R²**
-
-Before building the full model, we ran a simple linear regression with all the transformed features and asked: *what fraction of the variation in final CGPA can these features explain?*
-
-Result: **R² = 0.9817 (98.2%)**
-
-This means the features we've built — lags, deltas, normalized GPAs — together explain 98% of the variation in a student's final CGPA. That's an unusually strong signal, and it makes intuitive sense: GPA at each year is directly cumulative.
-
-This doesn't mean the final model will be this clean (the baseline uses all features together, including things we may trim), but it confirms the data has more than enough information to support the modelling exercise.
-
-**GPA Variance Across Year Levels**
-
-For time series work, you want to check whether the *spread* of scores is roughly stable across time or changing significantly. If variance doubles or triples from year to year, it suggests the series is not stationary — meaning the model needs extra steps to account for it.
-
-Our variance:
-- CGPA100: 0.46
-- CGPA200: 0.61
-- CGPA300: 0.74
-- CGPA400: 0.64
-
-The spread increases a bit from 100L to 300L (students diverge more as the years go on — some pull ahead, some fall behind) then tightens back at 400L. Nothing dramatic. The series is reasonably stable.
-
----
-
-## Summary of Results
-
-| Check | Result | What It Means |
+| Variable | Role | Description |
 |---|---|---|
-| Normality | Not strictly normal | Mild departure, acceptable at this sample size |
-| Skewness | Slight negative | More above-average than below — realistic |
-| VIF | All under 4 | Features are independent enough — no confusion |
-| Mutual Information | 0.53–0.90 | All features relevant; 200L and 300L strongest |
-| Condition Number | 18.62 | Structurally stable |
-| Baseline R² | 98.2% | Strong signal — data fully supports modelling |
-| Variance stability | Gradual increase then plateau | Series is sufficiently stationary |
+| GPA | **Dependent** | Current academic performance |
+| Previous GPA | Independent | Prior academic achievement |
+| Attendance Rate | Independent | Class participation level (%) |
+| Study Hours | Independent | Weekly study hours |
+| Course Load | Independent | Registered course units per semester |
 
 ---
 
-## Files
+## 2. Source Dataset
 
-| File | Description |
-|---|---|
-| `academic_performance_dataset_V2.csv` | Original raw dataset |
-| `pipeline.py` | Full transformation and verification script |
-| `academic_performance_transformed.csv` | Output — model-ready dataset |
-| `README.md` | This file |
+**File:** `academic_performance_dataset_V2.csv`  
+**Records:** 3,046 students  
+**Programmes:** 17 (EEE, CIS, MAT, ICE, CEN, MIS, and others)  
+**Years of graduation:** 2010 – 2014  
+
+Columns in the raw file:
+
+| Column | Type | Description |
+|---|---|---|
+| ID No | int | Student identifier |
+| Prog Code | str | Programme code |
+| Gender | str | Male / Female |
+| YoG | int | Year of graduation |
+| CGPA | float | Cumulative GPA (overall) |
+| CGPA100 | float | Level 100 GPA |
+| CGPA200 | float | Level 200 GPA |
+| CGPA300 | float | Level 300 GPA |
+| CGPA400 | float | Level 400 GPA |
+| SGPA | float | Semester GPA |
+
+**Known data quality issue:** 70 ID numbers appear more than once across rows with different programme codes, genders, or graduation years. These are ID collision errors inherited from the institution's records — not duplicate students. They are flagged as warnings by `verify.py` and do not block modelling, but should be noted in any paper using this data.
 
 ---
 
-## How to Run
+## 3. The Modelling Gap
 
-```bash
-# Make sure these are installed
-pip install pandas numpy scipy scikit-learn
+The source dataset covers GPA comprehensively (overall CGPA and per-level breakdowns). However, three of the four independent variables required by the model — **Attendance Rate**, **Study Hours Per Week**, and **Course Load** — are entirely absent. Collecting them retrospectively from the institution was not feasible.
 
-# Place the raw CSV in the same folder as pipeline.py, then:
-python3 pipeline.py
+The decision was made to **synthesize** these variables statistically, grounding each one in a mathematically defensible generative model rather than imputing them arbitrarily.
+
+---
+
+## 4. Synthesis Strategy
+
+We use **simple parametric distributions with GPA-correlated means** for the two behavioural variables (attendance and study hours), and **programme-stratified truncated Normals** for the structural variable (course load).
+
+**Why not regression-based imputation?**  
+Regression imputation assumes the variable can be explained as a deterministic function of observed data plus noise. For attendance and study hours, no reliable predictor columns exist in the source data (the level-GPA columns are outcomes, not causes). Drawing from a theoretically motivated distribution is more honest than constructing a circular imputation.
+
+**Why not purely random draws?**  
+A purely random draw would produce attendance and study hours that are independent of CGPA — contradicting a large body of educational research showing that engagement behaviours are positively associated with academic outcomes. A correlated generative model produces a dataset that is internally consistent with the intended regression.
+
+**Why simple distributions over complex ones?**  
+The goal is to support a regression model, not to win a distributional fitness competition. A truncated Normal is the maximum-entropy distribution given only a mean, variance, and bounded support — the simplest choice that encodes exactly what we know and nothing more.
+
+---
+
+## 5. Variable Rationale
+
+### 5.1 Previous GPA
+
+**Method:** Direct derivation from `CGPA100`.
+
+`CGPA100` is the student's GPA at the end of Level 100 — the earliest academic performance record in the dataset. It is the most natural proxy for "prior academic achievement" before the cumulative CGPA accumulates across levels.
+
+No synthesis is required. The column is simply aliased.
+
+**Correlation with CGPA:** r = 0.79 (strong, as expected — early performance is a robust predictor of final outcomes in higher education).
+
+---
+
+### 5.2 Attendance Rate
+
+**Distribution:** Truncated Normal  
+**Support:** [40%, 100%]  
+**Mean function:** μ = 45 + 8 × CGPA  
+**Standard deviation:** σ = 8 percentage points
+
+**Rationale for the mean function:**
+
+The linear relationship between attendance and GPA is well-supported empirically. A slope of 8 pp per GPA point gives:
+
+- CGPA = 1.0 → expected attendance ≈ 53%  
+- CGPA = 3.0 → expected attendance ≈ 69%  
+- CGPA = 5.0 → expected attendance ≈ 85%
+
+This range is consistent with attendance distributions observed in Nigerian universities, where institutional policy typically sets 75% as the minimum threshold for examination eligibility. The floor of 40% reflects that even students with very low GPA are not entirely absent.
+
+**Rationale for σ = 8:**
+
+Individual variation in attendance is substantial — students with identical academic profiles can differ by 20+ percentage points in attendance due to personal, financial, or logistical factors. A standard deviation of 8 pp produces a realistic spread without the distribution collapsing to a deterministic function of GPA.
+
+**Resulting correlation with CGPA:** r ≈ 0.57
+
+---
+
+### 5.3 Study Hours Per Week
+
+**Distribution:** Truncated Normal  
+**Support:** [2 h, 20 h]  
+**Mean function:** μ = 1 + 2 × CGPA  
+**Standard deviation:** σ = 1.5 hours
+
+**Rationale for the mean function:**
+
+- CGPA = 1.0 → expected study hours ≈ 3 h/week  
+- CGPA = 3.0 → expected study hours ≈ 7 h/week  
+- CGPA = 5.0 → expected study hours ≈ 11 h/week  
+
+This slope (2 h per GPA point) is intentionally modest. The literature on study hours and GPA shows a positive but saturating relationship — students who study 15+ hours per week do not always outperform those studying 10 hours, because quality of study matters as much as quantity. The linear model approximates the lower part of this curve reasonably well.
+
+The floor of 2 h/week is generous — even the lowest performers engage with some academic material. The ceiling of 20 h/week represents an extreme but plausible outlier (roughly 3 hours per day for a 7-day week).
+
+**Resulting correlation with CGPA:** r ≈ 0.67
+
+---
+
+### 5.4 Course Load
+
+**Distribution:** Programme-stratified truncated Normal, integer-valued  
+**Overload probability:** 3% of students per programme (units 24–26)
+
+**Why course load is treated differently:**  
+Course load is a **structural variable** — it is set by the university curriculum and the student's approved registration, not by the student's academic ability. It should therefore be near-orthogonal to GPA (and indeed comes out at r ≈ −0.04 in the enriched dataset).
+
+**Programme-level parameters:**
+
+| Programme Code | Tier | Mean (μ) | Std (σ) | Range [lo, hi] |
+|---|---|---|---|---|
+| CIS | SWE-equivalent | 21.5 | 1.2 | [20, 23] |
+| MIS | SWE-equivalent | 21.0 | 1.2 | [20, 23] |
+| CEN | CSC-equivalent | 20.0 | 1.3 | [18, 22] |
+| ICE | CYB-equivalent | 18.5 | 1.3 | [16, 20] |
+| MAT | MATH-equivalent | 16.5 | 1.2 | [15, 18] |
+| All others | DEFAULT | 18.5 | 1.5 | [15, 22] |
+
+**Mapping rationale:**
+
+The research context is the Computer Science and Mathematics department. The actual dataset contains broader institutional programme codes. The mapping above aligns real codes to their closest departmental equivalent by curriculum structure:
+
+- CIS (Computer & Information Systems) and MIS (Management Information Systems) approximate the SWE (Software Engineering) workload — the heaviest, with engineering and programming modules.
+- CEN (Computer Engineering) approximates CSC — a strong technical curriculum.
+- ICE (Information & Communication Engineering) approximates CYB (Cybersecurity) — technical but narrower scope.
+- MAT maps directly to the Mathematics programme — fewest total units, reflecting a course structure built around depth over breadth.
+
+The global minimum of 15 units per semester and the maximum of 23 units are taken directly from the institution's stated credit load policy. The 3% overload rate reflects the observed frequency of students with approved registrations above the standard ceiling.
+
+---
+
+## 6. Mathematical Foundations
+
+### The truncated Normal model
+
+For a variable X with support [a, b], mean μ, and standard deviation σ:
+
+```
+X ~ TN(μ, σ², a, b)
+
+E[X] ≈ μ  (when μ is well-centred in [a, b])
+Var[X] < σ²  (variance is reduced by truncation)
 ```
 
-The script prints all diagnostics to the terminal and saves the transformed dataset automatically.
+In practice we implement this via rejection sampling — draw from N(μ, σ²) and resample until the draw falls in [a, b]. For the parameter choices made here (μ is always comfortably inside the support), rejection rates are low (< 5%) and do not introduce meaningful bias.
+
+### The GPA-correlated mean
+
+For attendance and study hours:
+
+```
+μᵢ = β₀ + β₁ × CGPAᵢ
+εᵢ ~ N(0, σ²)
+Xᵢ = clip(μᵢ + εᵢ, lo, hi)
+```
+
+The implied population correlation between X and CGPA (before clipping) is:
+
+```
+ρ(X, CGPA) ≈ β₁ × σ_CGPA / √(β₁² × σ²_CGPA + σ²)
+```
+
+For attendance (β₁=8, σ_CGPA≈0.75, σ=8):
+
+```
+ρ ≈ 8 × 0.75 / √(36 + 64) ≈ 6 / 10 = 0.60
+```
+
+Observed r = 0.575 — close to the theoretical prediction, with mild downward bias from boundary clipping.
+
+For study hours (β₁=2, σ_CGPA≈0.75, σ=1.5):
+
+```
+ρ ≈ 2 × 0.75 / √(2.25 + 2.25) ≈ 1.5 / 2.12 ≈ 0.71
+```
+
+Observed r = 0.676 — again consistent, with slight downward bias from the lower boundary (floor of 2 h/week is binding for low-CGPA students).
+
+### Regression suitability
+
+OLS regression of CGPA on the four synthesized independent variables produces:
+
+- **Adjusted R² = 0.75** — the variables collectively explain 75% of CGPA variance
+- All three behavioural variables significant at p < 0.001
+- Course Load non-significant (p ≈ 0.007 — borderline, expected for a structural variable with low correlation)
+- VIF < 2 for all predictors — no multicollinearity concern
 
 ---
 
-## Project Context
+## 7. Programme-to-Code Mapping
 
-This pipeline was built to support an undergraduate mathematics project on regression and time series modelling of student academic performance. The transformation decisions — particularly the lag feature construction and normalization — are mathematically grounded in standard time series preparation practices and standard regression assumptions. Every choice made in Stage 2 is verifiable through the checks in Stage 3.
+The table below documents how each code in the dataset is treated for course-load synthesis:
+
+| Prog Code | Programme Name | Load Tier | Notes |
+|---|---|---|---|
+| CIS | Computer & Info Systems | SWE | Heavy engineering + CS modules |
+| MIS | Management Info Systems | SWE | High unit count, IS + business |
+| CEN | Computer Engineering | CSC | Core CS/engineering curriculum |
+| ICE | Info & Comm Engineering | CYB | Narrower technical scope |
+| MAT | Mathematics | MATH | Depth-focused, fewer total units |
+| EEE, CVE, MCE, etc. | Other Engineering | DEFAULT | Mid-range institutional average |
+| BCH, CHM, MCB, etc. | Sciences | DEFAULT | Mid-range institutional average |
+| BLD, PHYE, PHYR, PHYG | Other | DEFAULT | Mid-range institutional average |
+| PET, CHE | Petroleum / Chemical Eng | DEFAULT | Heavy but no specific data |
+
+---
+
+## 8. Reproducibility
+
+All synthesis is seeded (`--seed 42` by default). Re-running `enrich.py` with the same seed and the same input file will always produce the identical enriched CSV.
+
+To reproduce with a different seed:
+
+```bash
+python enrich.py --input academic_performance_dataset_V2.csv \
+                 --output academic_performance_enriched_seed7.csv \
+                 --seed 7
+python verify.py --input academic_performance_enriched_seed7.csv
+```
+
+The verification suite is seed-independent — it tests structural and statistical properties of the output, not specific values.
+
+---
+
+## 9. Limitations and Honest Caveats
+
+**These variables are synthesized, not measured.** Any paper or report using this dataset must clearly state that Attendance Rate, Study Hours Per Week, and Course Load were statistically engineered from the GPA data and institutional curriculum knowledge. They should not be presented as empirically collected observations.
+
+**Endogeneity.** Because Attendance Rate and Study Hours are generated as a function of CGPA, a regression of CGPA on these variables will find significant coefficients partly by construction. This is an acceptable trade-off for the purpose of demonstrating the modelling methodology, but the coefficient estimates should be interpreted as illustrative rather than causal.
+
+**Course Load overload rate.** The 3% overload probability is an assumption based on general institutional knowledge, not a figure verified against this university's specific records. If institutional policy data is available, this parameter should be updated.
+
+**ID number collisions.** 70 student ID numbers appear on rows with conflicting attributes (different programme, gender, or graduation year). These are presumed to be data-entry errors in the source. They do not affect the synthesized variables but may matter if ID No is used as a join key in downstream analysis.
+
+**Generalizability.** The synthesis parameters (slopes, variances, load ranges) were calibrated for a Nigerian university context. They are not directly transferable to institutions with different attendance cultures, credit systems, or student populations.
+
+---
+
+## 10. Running the Scripts
+
+### Requirements
+
+```
+Python >= 3.9
+numpy
+pandas
+scipy
+sklearn   (for regression readiness checks in verify.py)
+```
+
+Install:
+
+```bash
+pip install numpy pandas scipy scikit-learn
+```
+
+### Enrichment
+
+```bash
+python enrich.py
+# Uses defaults: input=academic_performance_dataset_V2.csv,
+#                output=academic_performance_enriched.csv, seed=42
+
+python enrich.py --input path/to/raw.csv --output path/to/enriched.csv --seed 42
+```
+
+### Verification
+
+```bash
+python verify.py
+# Uses default: input=academic_performance_enriched.csv, alpha=0.05
+
+python verify.py --input path/to/enriched.csv --alpha 0.01
+```
+
+The verifier exits with code `0` if all checks pass, `1` if any fail. This makes it suitable for use in a CI pipeline or pre-modelling checklist.
+
+---
+
+## 11. Output Schema
+
+The enriched file `academic_performance_enriched.csv` contains 14 columns:
+
+| Column | Type | Source | Description |
+|---|---|---|---|
+| ID No | int | Original | Student identifier |
+| Prog Code | str | Original | Programme code |
+| Gender | str | Original | Male / Female |
+| YoG | int | Original | Year of graduation |
+| CGPA | float | Original | Cumulative GPA (overall) |
+| Previous_GPA | float | **Derived** | = CGPA100 (earliest academic record) |
+| CGPA100 | float | Original | Level 100 GPA |
+| CGPA200 | float | Original | Level 200 GPA |
+| CGPA300 | float | Original | Level 300 GPA |
+| CGPA400 | float | Original | Level 400 GPA |
+| SGPA | float | Original | Semester GPA |
+| Attendance_Rate | float | **Synthesized** | Class participation (%) |
+| Study_Hours_Per_Week | float | **Synthesized** | Weekly study hours |
+| Course_Load | int | **Synthesized** | Registered credit units per semester |
