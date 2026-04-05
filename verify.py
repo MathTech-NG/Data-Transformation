@@ -110,9 +110,9 @@ def check_ranges(df: pd.DataFrame) -> list[bool]:
         f"Violations: {(~df['Study_Hours_Per_Week'].between(2.0, 20.0)).sum()}",
     ))
     results.append(check(
-        "Course_Load in [15, 26]",
-        df["Course_Load"].between(15, 26).all(),
-        f"Violations: {(~df['Course_Load'].between(15, 26)).sum()}",
+        "Course_Load in [8, 20]  (number of courses per semester)",
+        df["Course_Load"].between(8, 20).all(),
+        f"Violations: {(~df['Course_Load'].between(8, 20)).sum()}",
     ))
     results.append(check(
         "YoG in plausible range [2005, 2030]",
@@ -155,9 +155,9 @@ def check_distributions(df: pd.DataFrame, alpha: float) -> list[bool]:
     # ── Course load: mean within expected band ────────────────────────────────
     prog_means = df.groupby("Prog Code")["Course_Load"].mean()
     prog_bounds = {
-        "CIS": (20, 23), "MIS": (20, 23),
-        "CEN": (18, 22), "ICE": (16, 20),
-        "MAT": (15, 18),
+        "CIS": (11, 15), "MIS": (11, 15),
+        "CEN": (10, 14), "ICE": ( 9, 13),
+        "MAT": ( 8, 12),
     }
     for prog, (lo, hi) in prog_bounds.items():
         if prog not in prog_means.index:
@@ -181,16 +181,16 @@ def check_correlations(df: pd.DataFrame) -> list[bool]:
 
     r_att = df["CGPA"].corr(df["Attendance_Rate"])
     results.append(check(
-        "Attendance_Rate positively correlated with CGPA (r > 0.30)",
-        r_att > 0.30,
-        f"Pearson r = {r_att:.3f}",
+        "Attendance_Rate weakly-to-moderately correlated with CGPA (0.15 < r < 0.45)",
+        0.15 < r_att < 0.45,
+        f"Pearson r = {r_att:.3f}  (blended synthesis target: ~0.25–0.30)",
     ))
 
     r_sh = df["CGPA"].corr(df["Study_Hours_Per_Week"])
     results.append(check(
-        "Study_Hours_Per_Week positively correlated with CGPA (r > 0.40)",
-        r_sh > 0.40,
-        f"Pearson r = {r_sh:.3f}",
+        "Study_Hours_Per_Week weakly-to-moderately correlated with CGPA (0.15 < r < 0.45)",
+        0.15 < r_sh < 0.45,
+        f"Pearson r = {r_sh:.3f}  (blended synthesis target: ~0.25–0.30)",
     ))
 
     r_cl = df["CGPA"].corr(df["Course_Load"])
@@ -202,9 +202,9 @@ def check_correlations(df: pd.DataFrame) -> list[bool]:
 
     r_prev = df["CGPA"].corr(df["Previous_GPA"])
     results.append(check(
-        "Previous_GPA strongly correlated with CGPA (r > 0.60)",
-        r_prev > 0.60,
-        f"Pearson r = {r_prev:.3f}",
+        "Previous_GPA strongly correlated with CGPA (r > 0.80)",
+        r_prev > 0.80,
+        f"Pearson r = {r_prev:.3f}  (lagged 3-year cumulative GPA)",
     ))
 
     return results
@@ -252,11 +252,13 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
     r2_adj = 1 - (1 - r2) * (n - 1) / (n - k - 1)
 
     results.append(check(
-        f"Adjusted R² > 0.70  (observed: {r2_adj:.3f})",
-        r2_adj > 0.70,
+        f"Adjusted R² > 0.60  (observed: {r2_adj:.3f})",
+        r2_adj > 0.60,
+        "Lower R² expected vs v1 — blended synthesis deliberately weakens endogeneity",
     ))
 
-    significant = ["Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week"]
+    significant = ["Previous_GPA"]
+    informational = ["Attendance_Rate", "Study_Hours_Per_Week"]
     for i, var in enumerate(predictors):
         p = p_vals[i + 1]
         if var in significant:
@@ -265,10 +267,16 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
                 p < alpha,
                 f"p = {p:.4f}",
             ))
+        elif var in informational:
+            results.append(check(
+                f"{var} direction check: positive coefficient",
+                beta[i + 1] > 0,
+                f"p = {p:.4f},  β = {beta[i+1]:.4f}  (weak correlation by design — significance not guaranteed)",
+            ))
         else:
             results.append(check(
                 f"{var} non-significant in OLS (structural variable, p may be > {alpha})",
-                True,   # informational only — not a hard pass/fail
+                True,
                 f"p = {p:.4f}",
             ))
 
