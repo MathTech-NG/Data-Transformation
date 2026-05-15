@@ -8,9 +8,9 @@ It is the first thing an agent should read after AGENTS.md.
 
 ## Current State (as of Session 3)
 
-**Pipeline status:** STABLE — all 34 verify.py checks pass  
+**Pipeline status:** STABLE — all 43 verify.py checks pass  
 **Active branch of work:** Prediction layer shipped (`predict.py`, `score.py`, `prediction_common.py`, Streamlit tab **Predict & CV**).  
-**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 14 columns  
+**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 15 columns (includes `Genotype`)  
 
 ### Dataset summary
 

@@ -107,8 +107,17 @@ OVERLOAD_PROB = 0.05    # ~5% of students register extra courses
 OVERLOAD_LO   = 16
 OVERLOAD_HI   = 20      # inclusive — max approved overload
 
+# Haemoglobin genotype — independent multinomial draw (not observed in registrar data).
+# Proportions are illustrative Nigerian-population priors for AA / AS / SS; not MTU-verified.
+GENOTYPE_LABELS = ("AA", "AS", "SS")
+GENOTYPE_PROBS  = (0.75, 0.24, 0.01)
+
 
 # ─── SYNTHESIS FUNCTIONS ──────────────────────────────────────────────────────
+
+def synthesize_genotype(n: int, rng: np.random.Generator) -> np.ndarray:
+    """Independent multinomial draw for Genotype (AA, AS, SS)."""
+    return rng.choice(GENOTYPE_LABELS, size=n, p=GENOTYPE_PROBS)
 
 def synthesize_attendance(cgpa: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """
@@ -197,11 +206,14 @@ def enrich(input_path: str, output_path: str, seed: int) -> pd.DataFrame:
     # Unchanged: programme-stratified course load
     df["Course_Load"] = synthesize_course_load(df["Prog Code"], rng)
 
+    df["Genotype"] = synthesize_genotype(len(df), rng)
+
     cols = [
         "ID No", "Prog Code", "Gender", "YoG",
         "CGPA", "Previous_GPA",
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
+        "Genotype",
     ]
     df = df[cols]
 

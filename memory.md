@@ -110,19 +110,20 @@ CIS/MIS/CEN/ICE are extrapolated from programme-tier ranking logic.
 
 ## §5. Verify.py Check Suite
 
-**Current check count:** 34  
+**Current check count:** 43 (34 original + 4 genotype frequency/category + 1 genotype correlation + 4 VIF on extended design)  
 **Exit code 0:** all checks passed  
 **Exit code 1:** one or more failed  
 
 Checks cover:
 1. Schema & Integrity (3 checks)
 2. Value Ranges (11 checks)
+2b. Genotype (4 checks)
 3. Distributional Plausibility (7 checks)
-4. Correlation Structure (4 checks)
-5. Regression Readiness (9 checks — adj R², significance, VIF)
+4. Correlation Structure (5 checks)
+5. Regression Readiness (13 checks — adj R², significance, VIF on six-predictor design)
 
 **Rule:** Checks may only be added, never removed or weakened.  
-**Last confirmed pass:** Session 3, all 34 checks pass.
+**Last confirmed pass:** Genotype integration session, all 43 checks pass.
 
 ---
 
@@ -155,3 +156,14 @@ a predictor until OQ-4 is resolved.
 path for hypothetical or new rows without changing the synthesis or verify gates.
 
 **Resolved by:** Implementation session (prediction layer), May 2026.
+
+---
+
+## §8. Genotype synthesis
+
+**Decision:** Add `Genotype` column (AA, AS, SS) via independent multinomial draw in `enrich.py`.  
+**Parameters:** `GENOTYPE_PROBS = (0.75, 0.24, 0.01)` — illustrative Nigerian-population priors; **not** from MTU medical records.  
+**Modelling:** OLS uses reference category AA with dummies `Genotype_AS`, `Genotype_SS`.  
+**Reason:** Align empirical pipeline with Chapters 1–2 health variable; draw is CGPA-independent (verify: $|r| < 0.15$).  
+**Limitation:** L7 — synthesized genotype, same epistemic status as attendance/study hours.  
+**Resolved by:** Genotype integration session, May 2026.

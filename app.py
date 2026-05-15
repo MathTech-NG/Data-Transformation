@@ -28,7 +28,10 @@ import statsmodels.api as sm
 import streamlit as st
 
 from prediction_common import (
+    DESIGN_COLUMNS,
+    build_design_matrix,
     cross_val_ols_metrics,
+    fit_reference_ols,
     prepare_scoring_features,
     score_dataframe,
     soft_validate_predictors,
@@ -78,10 +81,7 @@ def load_data() -> pd.DataFrame:
 
 @st.cache_resource
 def run_ols(_df: pd.DataFrame):
-    predictors = ["Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
-    X = sm.add_constant(_df[predictors])
-    y = _df["CGPA"]
-    return sm.OLS(y, X).fit()
+    return fit_reference_ols(_df, target="CGPA")
 
 
 # ─── SIDEBAR — LIMITATIONS ────────────────────────────────────────────────────
@@ -118,6 +118,11 @@ LIMITATIONS = {
         "Synthesis parameters were calibrated for a Nigerian university context (Mountain Top "
         "University). They are not directly transferable to other institutions."
     ),
+    "L7 — Synthesized genotype": (
+        "`Genotype` (AA, AS, SS) was not collected from medical records. Values are drawn from "
+        "fixed population proportions (75% / 24% / 1%) independent of CGPA. Coefficients for "
+        "genotype dummies carry no clinical or empirical weight."
+    ),
 }
 
 with st.sidebar:
@@ -139,7 +144,11 @@ df    = load_data()
 model = run_ols(df)
 
 # Derived quantities used across tabs
-PREDICTORS   = ["Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
+PREDICTORS   = DESIGN_COLUMNS
+COEF_LABELS  = [
+    "Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
+    "Genotype (AS vs AA)", "Genotype (SS vs AA)",
+]
 LEVEL_COLS   = ["CGPA100", "CGPA200", "CGPA300", "CGPA400"]
 LEVEL_LABELS = ["Level 100", "Level 200", "Level 300", "Level 400"]
 fitted       = model.fittedvalues
@@ -181,6 +190,7 @@ with tab1:
             "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
         ]
         st.dataframe(df[numeric_cols].describe().T.round(3), width="stretch")
+        st.caption("Genotype counts: " + df["Genotype"].value_counts().sort_index().to_string())
 
     st.divider()
 
@@ -311,12 +321,12 @@ with tab2:
 
     # ── Coefficient bar chart ─────────────────────────────────────────────────
     st.subheader("Coefficients (± 1.96 SE)")
-    coefs  = model.params[PREDICTORS]
-    errors = model.bse[PREDICTORS] * 1.96
+    coefs  = model.params[DESIGN_COLUMNS]
+    errors = model.bse[DESIGN_COLUMNS] * 1.96
     colors = ["#2196F3" if c > 0 else "#F44336" for c in coefs]
 
     fig_coef = go.Figure(go.Bar(
-        y=PREDICTORS,
+        y=COEF_LABELS,
         x=coefs.values,
         orientation="h",
         error_x=dict(type="data", array=errors.values, visible=True),
@@ -614,6 +624,7 @@ with tab4:
         cl = st.number_input(
             "Course_Load (# courses)", min_value=0, max_value=25, value=11, step=1
         )
+        genotype = st.selectbox("Genotype", ["AA", "AS", "SS"], index=0)
         if mode_prev == "Enter Previous_GPA directly":
             prev = st.number_input(
                 "Previous_GPA", min_value=0.0, max_value=5.0, value=3.2, step=0.01
@@ -623,6 +634,7 @@ with tab4:
                 "Attendance_Rate": att,
                 "Study_Hours_Per_Week": sh,
                 "Course_Load": int(cl),
+                "Genotype": genotype,
             }])
         else:
             g1 = st.number_input(
@@ -641,6 +653,7 @@ with tab4:
                 "Attendance_Rate": att,
                 "Study_Hours_Per_Week": sh,
                 "Course_Load": int(cl),
+                "Genotype": genotype,
             }])
         if st.button("Compute predicted CGPA"):
             Xs, msgs = prepare_scoring_features(raw_in)

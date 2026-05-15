@@ -16,9 +16,20 @@ import statsmodels.api as sm
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
-PREDICTORS = ["Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
+CONTINUOUS_PREDICTORS = [
+    "Previous_GPA",
+    "Attendance_Rate",
+    "Study_Hours_Per_Week",
+    "Course_Load",
+]
+GENOTYPE_DUMMY_COLS = ["Genotype_AS", "Genotype_SS"]
+DESIGN_COLUMNS = CONTINUOUS_PREDICTORS + GENOTYPE_DUMMY_COLS
 LEVEL_FOR_PREVIOUS = ["CGPA100", "CGPA200", "CGPA300"]
 BEHAVIOURAL = ["Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
+VALID_GENOTYPES = frozenset({"AA", "AS", "SS"})
+
+# Backward-compatible alias (continuous only — use DESIGN_COLUMNS for OLS)
+PREDICTORS = CONTINUOUS_PREDICTORS
 
 
 def load_enriched_deduped(path: str) -> pd.DataFrame:
@@ -33,9 +44,32 @@ def derive_previous_gpa(df: pd.DataFrame) -> pd.Series:
     return ((df["CGPA100"] + df["CGPA200"] + df["CGPA300"]) / 3).round(4)
 
 
+def build_design_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    OLS design matrix: four continuous predictors + Genotype dummies (AA reference).
+    Requires column Genotype with values AA, AS, or SS.
+    """
+    if "Genotype" not in df.columns:
+        raise KeyError("Column 'Genotype' is required (AA, AS, or SS).")
+    bad = set(df["Genotype"].astype(str).unique()) - VALID_GENOTYPES
+    if bad:
+        raise ValueError(f"Invalid Genotype value(s): {bad}")
+
+    cont = df[CONTINUOUS_PREDICTORS].astype(float)
+    gt = df["Genotype"].astype(str)
+    dums = pd.DataFrame(
+        {
+            "Genotype_AS": (gt == "AS").astype(float),
+            "Genotype_SS": (gt == "SS").astype(float),
+        },
+        index=df.index,
+    )
+    return pd.concat([cont, dums], axis=1)
+
+
 def fit_reference_ols(df: pd.DataFrame, target: str = "CGPA"):
     """Full-sample OLS used for operational scoring (matches app.py)."""
-    X = sm.add_constant(df[PREDICTORS])
+    X = sm.add_constant(build_design_matrix(df))
     y = df[target]
     return sm.OLS(y, X).fit()
 
@@ -47,7 +81,7 @@ def cross_val_ols_metrics(
     seed: int,
 ) -> dict[str, Any]:
     """
-    K-fold CV with the same four-predictor OLS specification.
+    K-fold CV with the same OLS specification (continuous + genotype dummies).
     Returns stacked out-of-fold predictions for MAE / RMSE / R² and baseline metrics.
     """
     if target_col not in df.columns:
@@ -64,10 +98,10 @@ def cross_val_ols_metrics(
     for train_idx, test_idx in kf.split(np.arange(n)):
         d_train = df.iloc[train_idx]
         d_test = df.iloc[test_idx]
-        X_tr = sm.add_constant(d_train[PREDICTORS])
+        X_tr = sm.add_constant(build_design_matrix(d_train))
         y_tr = d_train[target_col]
         fit = sm.OLS(y_tr, X_tr).fit()
-        X_te = sm.add_constant(d_test[PREDICTORS], has_constant="add")
+        X_te = sm.add_constant(build_design_matrix(d_test), has_constant="add")
         oof_pred[test_idx] = fit.predict(X_te)
         oof_base[test_idx] = float(y_tr.mean())
 
@@ -91,18 +125,26 @@ def cross_val_ols_metrics(
 
 def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """
-    Build the four-predictor matrix from user rows.
+    Build rows with continuous predictors + Genotype for build_design_matrix.
 
-    Either supply Previous_GPA + three behavioural columns, or CGPA100–300 + behavioural.
-    If both level GPAs and Previous_GPA are present, Previous_GPA is taken as authoritative
-    but a warning is emitted when it disagrees with mean(levels) by more than 0.01.
+    Either supply Previous_GPA + behavioural + Genotype, or CGPA100–300 + behavioural + Genotype.
     """
     msgs: list[str] = []
-    used = set(PREDICTORS) | set(LEVEL_FOR_PREVIOUS)
+    used = (
+        set(CONTINUOUS_PREDICTORS)
+        | set(LEVEL_FOR_PREVIOUS)
+        | {"Genotype"}
+        | set(GENOTYPE_DUMMY_COLS)
+    )
     extras = [c for c in raw.columns if c not in used]
     if extras:
         msgs.append(
             "Ignoring columns not used by the scorer: " + ", ".join(sorted(extras))
+        )
+
+    if "Genotype" not in raw.columns:
+        raise ValueError(
+            "Missing required column 'Genotype'. Use AA, AS, or SS."
         )
 
     has_prev = "Previous_GPA" in raw.columns
@@ -111,8 +153,8 @@ def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
         if col not in raw.columns:
             raise ValueError(
                 f"Missing required column '{col}'. "
-                "Need Attendance_Rate, Study_Hours_Per_Week, Course_Load, plus either "
-                "Previous_GPA or CGPA100, CGPA200, CGPA300."
+                "Need Attendance_Rate, Study_Hours_Per_Week, Course_Load, Genotype, "
+                "plus either Previous_GPA or CGPA100, CGPA200, CGPA300."
             )
 
     out = raw.copy()
@@ -131,36 +173,38 @@ def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
     else:
         raise ValueError(
             "Provide either 'Previous_GPA' or all of 'CGPA100', 'CGPA200', 'CGPA300' "
-            "(plus the three behavioural columns)."
+            "(plus behavioural columns and Genotype)."
         )
 
-    X = out[PREDICTORS].copy()
-    return X, msgs
+    return out[CONTINUOUS_PREDICTORS + ["Genotype"]].copy(), msgs
 
 
-def soft_validate_predictors(X: pd.DataFrame) -> list[str]:
+def soft_validate_predictors(df: pd.DataFrame) -> list[str]:
     """Return warning strings for values outside training-plausible ranges."""
     w: list[str] = []
-    if (X["Attendance_Rate"] < 40).any() or (X["Attendance_Rate"] > 100).any():
+    if (df["Attendance_Rate"] < 40).any() or (df["Attendance_Rate"] > 100).any():
         w.append("Some Attendance_Rate values are outside [40, 100].")
-    if (X["Study_Hours_Per_Week"] < 2).any() or (X["Study_Hours_Per_Week"] > 20).any():
+    if (df["Study_Hours_Per_Week"] < 2).any() or (df["Study_Hours_Per_Week"] > 20).any():
         w.append("Some Study_Hours_Per_Week values are outside [2, 20].")
-    if (X["Course_Load"] < 8).any() or (X["Course_Load"] > 20).any():
+    if (df["Course_Load"] < 8).any() or (df["Course_Load"] > 20).any():
         w.append("Some Course_Load values are outside [8, 20].")
-    if (X["Previous_GPA"] < 0).any() or (X["Previous_GPA"] > 5).any():
+    if (df["Previous_GPA"] < 0).any() or (df["Previous_GPA"] > 5).any():
         w.append("Some Previous_GPA values are outside [0, 5].")
+    bad_gt = set(df["Genotype"].astype(str).unique()) - VALID_GENOTYPES
+    if bad_gt:
+        w.append(f"Invalid Genotype value(s): {sorted(bad_gt)}.")
     return w
 
 
-def score_dataframe(model: Any, X: pd.DataFrame) -> pd.Series:
+def score_dataframe(model: Any, feature_rows: pd.DataFrame) -> pd.Series:
     """Vector of predicted CGPA (same target the reference model was fit on)."""
-    X_const = sm.add_constant(X[PREDICTORS], has_constant="add")
+    X_const = sm.add_constant(build_design_matrix(feature_rows), has_constant="add")
     return pd.Series(model.predict(X_const), name="predicted_CGPA")
 
 
 def print_limitation_banner() -> None:
     print(
-        "\nNote (L1–L3): Attendance and study hours are partly synthesized from CGPA; "
+        "\nNote (L1–L3, L7): Attendance, study hours, and genotype are synthesized; "
         "Previous_GPA overlaps arithmetically with final CGPA. "
         "Metrics and scores are illustrative — not empirical proof of causation.\n"
     )

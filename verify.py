@@ -50,6 +50,7 @@ def check_schema(df: pd.DataFrame) -> list[bool]:
         "CGPA", "Previous_GPA",
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
+        "Genotype",
     }
     missing = required - set(df.columns)
     results.append(check(
@@ -117,6 +118,38 @@ def check_ranges(df: pd.DataFrame) -> list[bool]:
     results.append(check(
         "YoG in plausible range [2005, 2030]",
         df["YoG"].between(2005, 2030).all(),
+    ))
+    return results
+
+
+def check_genotype(df: pd.DataFrame) -> list[bool]:
+    """Synthesized haemoglobin genotype: categories and marginal frequencies."""
+    results = []
+    valid = {"AA", "AS", "SS"}
+    observed = set(df["Genotype"].astype(str).unique())
+    results.append(check(
+        "Genotype in {AA, AS, SS}",
+        observed <= valid,
+        f"Unexpected: {observed - valid}" if not observed <= valid else "",
+    ))
+    n = len(df)
+    p_aa = (df["Genotype"] == "AA").mean()
+    p_as = (df["Genotype"] == "AS").mean()
+    p_ss = (df["Genotype"] == "SS").mean()
+    results.append(check(
+        "Genotype AA share plausible (target ~0.75, band [0.65, 0.85])",
+        0.65 <= p_aa <= 0.85,
+        f"Observed AA = {p_aa:.3f}",
+    ))
+    results.append(check(
+        "Genotype AS share plausible (target ~0.24, band [0.15, 0.35])",
+        0.15 <= p_as <= 0.35,
+        f"Observed AS = {p_as:.3f}",
+    ))
+    results.append(check(
+        "Genotype SS share plausible (target ~0.01, band [0.003, 0.05])",
+        0.003 <= p_ss <= 0.05,
+        f"Observed SS = {p_ss:.3f}",
     ))
     return results
 
@@ -207,31 +240,41 @@ def check_correlations(df: pd.DataFrame) -> list[bool]:
         f"Pearson r = {r_prev:.3f}  (lagged 3-year cumulative GPA)",
     ))
 
+    # Genotype synthesized independently of CGPA — |r| should be small
+    gt_num = df["Genotype"].map({"AA": 0, "AS": 1, "SS": 2}).astype(float)
+    r_gt = df["CGPA"].corr(gt_num)
+    results.append(check(
+        "Genotype ordinal proxy weakly correlated with CGPA (|r| < 0.15)",
+        abs(r_gt) < 0.15,
+        f"Pearson r = {r_gt:.3f}  (independent synthesis)",
+    ))
+
     return results
 
 
 def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
     """
     Lightweight OLS regression check:
-        CGPA ~ Previous_GPA + Attendance_Rate + Study_Hours_Per_Week + Course_Load
+        CGPA ~ Previous_GPA + Attendance + Study_Hours + Course_Load + Genotype dummies
 
     Verifies that:
       - Previous_GPA, Attendance_Rate, Study_Hours_Per_Week are significant (p < alpha)
       - Course_Load is non-significant (it is a structural variable, not a GPA predictor)
-      - Adjusted R² > 0.70 (the independent variables collectively explain most variance)
+      - Adjusted R² > 0.60
       - VIF < 10 for all predictors (no severe multicollinearity)
     """
     try:
-        from sklearn.linear_model import LinearRegression
         from sklearn.preprocessing import StandardScaler
-    except ImportError:
-        print("  [SKIP]  Regression readiness — sklearn not installed")
+
+        from prediction_common import DESIGN_COLUMNS, build_design_matrix
+    except ImportError as e:
+        print(f"  [SKIP]  Regression readiness — {e}")
         return []
 
     results = []
 
-    predictors = ["Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
-    X = df[predictors].values
+    predictors = DESIGN_COLUMNS
+    X = build_design_matrix(df).values
     y = df["CGPA"].values
     n, k = X.shape
 
@@ -310,6 +353,7 @@ def run_all_checks(input_path: str, alpha: float) -> int:
     sections = [
         ("1. Schema & Integrity",         check_schema(df)),
         ("2. Value Ranges",                check_ranges(df)),
+        ("2b. Genotype",                   check_genotype(df)),
         ("3. Distributional Plausibility", check_distributions(df, alpha)),
         ("4. Correlation Structure",       check_correlations(df)),
         ("5. Regression Readiness",        check_regression_readiness(df, alpha)),

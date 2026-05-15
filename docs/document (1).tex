@@ -95,6 +95,8 @@
 	
 	This model shows that students’ academic performance depends on study hours, attendance, and genotype, while the error term captures other influencing factors not included in the model.
 	
+	The empirical implementation at Mountain Top University extends this introductory specification with two additional constructs grounded in the available registrar data: a lagged cumulative GPA (\textit{Previous\_GPA}) derived from per-level grades, and \textit{Course\_Load} measured as the number of courses registered per semester. Chapter~3 presents the full operational model fitted to the enriched dataset.
+	
 	\section{Significance of the Study}
 	This study is important since it is a contribution to the use of Mathematical Modelling and Statistical Analysis in the solution of educational problems on students academic performance. The study establishes a regression model prediction system that provides a systematic solution for analyzing the relationship between academic performance and factors affecting it (study hours, attendance, genotype).
 	The study is useful for students, teachers, researchers and institutions. As a study for students, the study aims to identify the factors that affect the success of a student's study and at the same time encourage students to improve their study habits and class participation. Developed model can be used as a decision support tool for educators/institutions to monitor students' progress and determine students who need academic intervention.
@@ -246,6 +248,8 @@
 	Furthermore, many educational performance studies utilize datasets that are incomplete or institution-specific, thereby limiting the generalizability of their findings. The absence of integrated datasets containing academic, behavioral, and health-related variables creates challenges in developing robust predictive systems.
 	Therefore, this study seeks to address these gaps by developing a regression-based predictive model that integrates multiple variables, including GPA, study hours, attendance, and genotype. The study also combines simulated and real-life datasets and validates the developed model using independent real-world data to improve reliability, accuracy, and practical relevance.
 	
+	The fitted empirical model (Chapter~3) therefore uses observed cumulative and per-level GPA from institutional records, statistically synthesized behavioural and health-related fields where records were incomplete, and ordinary least squares (OLS) with out-of-sample validation rather than a machine-learning train--test partition.
+	
 	\section{Theoretical Framework}
 	The theory used for this study is regression analysis and predictive modelling because it is a systematic approach in statistics applied to analyze the relationship between the dependent variable and an independent variable or more than one independent variable. The theory of regression is frequently used in the educational research due to its ability to determine, measure and predict the influence of various factors on academic performance.
 	
@@ -260,5 +264,164 @@
 	Thus, the framework offers the mathematical and statistical underpinning for understanding the relationships between variables, for testing of hypotheses, and for the generation of predictive models that can accurately and reliably estimate students' academic outcomes with a reasonable level of accuracy.
 	
 	\chapter{Methodology: Design and Implementation}
+	
+	\section{Introduction}
+	This chapter describes the research design, data sources, variable construction, regression specification, estimation procedures, and predictive validation used to analyse and forecast students' academic performance at Mountain Top University (MTU). The workflow is fully reproducible: enrichment (\texttt{enrich.py}), automated integrity checks (\texttt{verify.py}), exploratory and inferential analysis (\texttt{model.ipynb}), out-of-sample evaluation (\texttt{predict.py}), and operational scoring for new cases (\texttt{score.py}).
+	
+	\section{Research Design}
+	The study adopts a quantitative, explanatory and predictive design. Explanatory analysis estimates the linear association between cumulative GPA (CGPA) and selected academic, behavioural, and health-related predictors using multiple OLS regression with standard diagnostic tests. Predictive analysis reports k-fold out-of-sample error (mean absolute error, root mean squared error, and stacked out-of-fold $R^2$) and provides a scoring interface for hypothetical student profiles. All synthesis uses a fixed random seed (42) so results can be replicated exactly.
+	
+	\section{Study Setting and Data Sources}
+	Secondary data comprise 3,046 graduate records from MTU spanning 17 programme codes and graduation years 2010--2014. The immutable source file is \texttt{academic\_performance\_dataset\_V2.csv}. Table~\ref{tab:data-sources} classifies variables by origin.
+	
+	\begin{table}[htbp]
+		\centering
+		\caption{Classification of variables in the enriched dataset}
+		\label{tab:data-sources}
+		\begin{tabular}{llp{7cm}}
+			\hline
+			\textbf{Class} & \textbf{Variables} & \textbf{Notes} \\
+			\hline
+			Observed & ID, programme, gender, YoG, CGPA, CGPA100--400, SGPA & From registrar records; no missing values \\
+			Derived & Previous\_GPA & Mean of CGPA100, CGPA200, CGPA300 (lagged three-year average) \\
+			Synthesized & Attendance\_Rate, Study\_Hours\_Per\_Week, Course\_Load, Genotype & Not in source export; generated in \texttt{enrich.py} \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	Attendance, weekly study hours, course load, and haemoglobin genotype were absent from the historical export and could not be recovered retrospectively. They were synthesized under documented assumptions (Sections~\ref{sec:synthesis}--\ref{sec:genotype-synth}). CGPA and per-level GPAs are treated as observed administrative outcomes on MTU's 0--5 scale.
+	
+	\section{Data Preprocessing}
+	Preprocessing steps were: (i)~load the raw CSV without modification; (ii)~derive \textit{Previous\_GPA}; (iii)~synthesize missing predictors; (iv)~run 43 automated checks in \texttt{verify.py} (exit code 0 required before modelling); (v)~for analysis notebooks and apps, drop duplicate \textit{ID No} rows where programme, gender, or graduation year conflict (70 collision IDs in the source---data-entry errors, not enrichment artefacts), retaining the first occurrence ($n = 2{,}974$ students for regression).
+	
+	No imputation of nulls was required in the source file. Variables were not normalized for OLS estimation; coefficients are reported on the original scales (percentage attendance, hours per week, integer course count, and genotype indicators).
+	
+	\section{Variable Operationalization}
+	\label{sec:operationalization}
+	\textbf{Dependent variable:} CGPA, the overall cumulative grade point average at graduation.
+	
+	\textbf{Previous\_GPA:} $\text{Previous\_GPA} = (\text{CGPA100} + \text{CGPA200} + \text{CGPA300})/3$, rounded to four decimal places. This is the mean performance over the first three academic levels and is temporally prior to Level~400 outcomes embedded in final CGPA.
+	
+	\textbf{Course\_Load:} Number of courses registered per semester (integer, range 8--20), programme-stratified; not credit units.
+	
+	\textbf{Attendance\_Rate} and \textbf{Study\_Hours\_Per\_Week:} Synthesized behavioural measures (Sections~\ref{sec:synthesis}).
+	
+	\textbf{Genotype:} Categorical haemoglobin genotype AA, AS, or SS (Section~\ref{sec:genotype-synth}).
+	
+	\section{Synthesis of Behavioural Variables}
+	\label{sec:synthesis}
+	To mitigate endogeneity, attendance and study hours use a \textit{blended} generative model with blend parameter $\alpha = 0.60$:
+	\begin{equation}
+		X = \alpha \cdot X_{\text{base}} + (1 - \alpha) \cdot X_{\text{corr}} + \eta,
+	\end{equation}
+	where $X_{\text{base}}$ is drawn from a CGPA-independent population distribution, $X_{\text{corr}}$ is a linear function of CGPA, and $\eta$ is Gaussian noise. Values are clipped to plausible ranges (attendance 40--100\%; study hours 2--20 per week). At $\alpha = 0.60$, Pearson correlations with CGPA are approximately 0.28 (attendance) and 0.24 (study hours), reflecting weak but non-zero behavioural association rather than near-deterministic reconstruction of CGPA.
+	
+	Course load is drawn from programme-specific truncated normal distributions (e.g.\ CIS/MIS heavier than MAT), with about 5\% of students assigned an approved overload (16--20 courses). Course load is structurally independent of CGPA ($|r| \approx 0.03$).
+	
+	\section{Synthesis of Genotype}
+	\label{sec:genotype-synth}
+	Genotype is assigned by an independent multinomial draw with probabilities $P(\text{AA}) = 0.75$, $P(\text{AS}) = 0.24$, $P(\text{SS}) = 0.01$, reflecting illustrative Nigerian population priors for haemoglobin genotypes. The draw is \textit{not} conditioned on CGPA and is \textit{not} taken from student health records. In regression, AA is the reference category; AS and SS enter as dummy indicators \texttt{Genotype\_AS} and \texttt{Genotype\_SS}.
+	
+	\section{Regression Model Specification}
+	The empirical multiple linear regression model is:
+	\begin{equation}
+		\text{CGPA}_i = \beta_0 + \beta_1 \text{Previous\_GPA}_i + \beta_2 \text{Attendance}_i + \beta_3 \text{StudyHours}_i + \beta_4 \text{CourseLoad}_i + \beta_5 D_{\text{AS},i} + \beta_6 D_{\text{SS},i} + \varepsilon_i,
+		\label{eq:full-model}
+	\end{equation}
+	where $D_{\text{AS}}$ and $D_{\text{SS}}$ are one if genotype is AS or SS respectively, and zero otherwise (reference: AA). Equation~(\ref{eq:full-model}) extends the three-predictor specification in Chapter~1 with lagged academic history and course load while retaining study hours, attendance, and genotype as stated in the research objectives.
+	
+	OLS assumptions (linearity, independent errors, homoskedasticity, and approximate normality of residuals) were assessed graphically via residuals-versus-fitted, Q--Q, and scale-location plots (Chapter~4). Variance inflation factors (VIF) for all predictors were below 10, indicating no severe multicollinearity in the fitted design matrix.
+	
+	\section{Estimation and Diagnostic Procedures}
+	Models were estimated with \texttt{statsmodels} OLS on the deduplicated enriched dataset. Reported inferential quantities include coefficient estimates, standard errors, $t$-statistics, $p$-values, and 95\% confidence intervals. Adjusted $R^2$ is reported alongside raw $R^2$. Coefficients on synthesized behavioural variables and genotype are interpreted as illustrative associations under the generative assumptions, not as causal effects (Limitations L1, L3, and L7 in Section~\ref{sec:limitations-results}).
+	
+	\section{Predictive Validation and Scoring}
+	Out-of-sample performance was evaluated with $k$-fold cross-validation ($k = 5$, random seed 42): within each fold, OLS was fitted on the training partition and used to predict CGPA on the held-out partition; errors were stacked across folds. Reported metrics are mean absolute error (MAE), root mean squared error (RMSE), and out-of-fold $R^2$, compared to a baseline that always predicts the training-fold mean CGPA. This is described as \textit{model fitting and out-of-sample validation}, not as a separate machine-learning training and testing pipeline.
+	
+	For operational forecasts, the same specification was refit on all deduplicated training rows; new input rows (CSV or JSON) supply attendance, study hours, course load, genotype, and either \textit{Previous\_GPA} or CGPA100--300 (from which \textit{Previous\_GPA} is computed). The tool writes a \texttt{predicted\_CGPA} column. Arbitrary semester-level SGPA sequences without level CGPAs are outside the scope of this model.
+	
+	\section{Software and Reproducibility}
+	Implementation used Python~3.9+ with \texttt{pandas}, \texttt{numpy}, \texttt{scipy}, \texttt{statsmodels} (primary estimation), \texttt{scikit-learn} (cross-validation splits and error metrics), \texttt{matplotlib}, \texttt{seaborn}, \texttt{plotly}, and \texttt{streamlit}. Canonical commands: \texttt{python enrich.py}; \texttt{python verify.py}; \texttt{python predict.py}; \texttt{python score.py}; \texttt{jupyter notebook model.ipynb}; \texttt{streamlit run app.py}.
+	
+	\section{Methodological Limitations}
+	\label{sec:method-limitations}
+	Seven limitations govern interpretation: (L1)~residual endogeneity in blended behavioural synthesis; (L2)~arithmetic overlap between \textit{Previous\_GPA} and CGPA; (L3)~synthesized behavioural variables are not observed; (L4)~overload rate and course ceiling assumptions; (L5)~ID collisions in source data; (L6)~parameters calibrated for MTU/Nigeria; (L7)~synthesized genotype, not clinical records. These are discussed again with results in Chapter~4.
+	
+	\chapter{Results and Analysis}
+	
+	\section{Introduction}
+	This chapter presents descriptive statistics, correlation structure, OLS estimates, regression diagnostics, out-of-sample predictive metrics, and time-series views of per-level GPA. All numerical results below were produced from \texttt{academic\_performance\_enriched.csv} after ID de-duplication ($n = 2{,}974$) with the pipeline described in Chapter~3.
+	
+	\section{Data Presentation}
+	Table~\ref{tab:descriptive} summarizes key numeric variables. CGPA averages 3.50 (SD 0.69) on the 0--5 scale. Synthesized genotype counts were AA = 2,209 (74.3\%), AS = 733 (24.6\%), and SS = 32 (1.1\%), consistent with the multinomial priors. Students span 17 programmes and graduation years 2010--2014.
+	
+	\begin{table}[htbp]
+		\centering
+		\caption{Descriptive statistics (deduplicated analysis sample, $n = 2{,}974$)}
+		\label{tab:descriptive}
+		\begin{tabular}{lrrrrr}
+			\hline
+			Variable & Mean & SD & Min & Median & Max \\
+			\hline
+			CGPA & 3.495 & 0.690 & 1.520 & 3.560 & 4.990 \\
+			Previous\_GPA & 3.459 & 0.691 & 1.363 & 3.497 & 4.993 \\
+			Attendance\_Rate (\%) & 71.02 & 8.26 & 40.0 & 71.3 & 96.9 \\
+			Study\_Hours\_Per\_Week & 7.35 & 2.18 & 2.0 & 7.3 & 15.1 \\
+			Course\_Load & 11.85 & 2.09 & 8 & 12 & 20 \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	\section{Correlation Structure}
+	Pearson correlations with CGPA were: \textit{Previous\_GPA} $r = 0.976$; \textit{Attendance\_Rate} $r = 0.285$; \textit{Study\_Hours\_Per\_Week} $r = 0.238$; \textit{Course\_Load} $r = -0.034$. The very strong association for \textit{Previous\_GPA} reflects definitional overlap with CGPA (Limitation L2), not solely empirical discovery. Genotype, synthesized independently of CGPA, showed negligible linear association with CGPA ($|r| < 0.15$ on an ordinal genotype proxy), as intended by the generative design.
+	
+	\section{Regression Results}
+	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.953$. \textit{Previous\_GPA} has coefficient $\hat{\beta}_1 \approx 0.964$ ($p < 0.001$): a one-point increase in the three-year mean GPA is associated with approximately a 0.96-point higher CGPA, holding other predictors fixed. Attendance and study hours are positive and statistically significant but small in magnitude ($\hat{\beta}_2 \approx 0.002$, $\hat{\beta}_3 \approx 0.006$ per unit). Course load is near zero ($\hat{\beta}_4 \approx -0.003$, $p \approx 0.016$). Genotype dummies are not significant (AS: $\hat{\beta}_5 \approx -0.0002$, $p \approx 0.98$; SS: $\hat{\beta}_6 \approx 0.014$, $p \approx 0.60$), consistent with independent synthesis and weak overlap with CGPA.
+	
+	\begin{table}[htbp]
+		\centering
+		\caption{OLS regression of CGPA on predictors ($n = 2{,}974$; adjusted $R^2 = 0.953$)}
+		\label{tab:regression}
+		\begin{tabular}{lrrr}
+			\hline
+			Predictor & Coefficient & $p$-value & VIF \\
+			\hline
+			Previous\_GPA & 0.964 & $< 0.001$ & 1.13 \\
+			Attendance\_Rate & 0.002 & $< 0.001$ & 1.08 \\
+			Study\_Hours\_Per\_Week & 0.006 & $< 0.001$ & 1.06 \\
+			Course\_Load & $-0.003$ & 0.016 & 1.00 \\
+			Genotype (AS vs AA) & $-0.0002$ & 0.977 & $< 1.2$ \\
+			Genotype (SS vs AA) & 0.014 & 0.597 & $< 1.2$ \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	\section{Model Diagnostics}
+	Residual plots (residuals versus fitted values, normal Q--Q, histogram, and scale-location) are produced in \texttt{model.ipynb} and the Streamlit OLS tab. Residuals cluster tightly around zero because \textit{Previous\_GPA} explains most of the variance; well-behaved diagnostics therefore reflect the dominant lagged-GPA term (L2) as much as model adequacy for behavioural predictors. No predictor exhibited VIF $\geq 10$.
+	
+	\section{In-Sample Fit}
+	The actual-versus-predicted CGPA scatter lies close to the 45$^\circ$ identity line (in-sample fitted values). This tight fit is expected given $r = 0.976$ between \textit{Previous\_GPA} and CGPA and should not be cited as proof that attendance or study hours drive final GPA in the data-generating process (L1, L3).
+	
+	\section{Out-of-Sample Predictive Performance}
+	Five-fold cross-validation (seed 42) yielded stacked out-of-fold MAE $= 0.113$, RMSE $= 0.150$, and $R^2 = 0.953$. The mean-only baseline achieved MAE $= 0.567$ and RMSE $= 0.690$, showing that the regression specification substantially reduces prediction error relative to guessing the sample mean, though most of that gain is attributable to \textit{Previous\_GPA}. These metrics support the secondary predictive objective under the stated synthesis assumptions; they do not validate causal claims about attendance, study hours, or genotype.
+	
+	\section{Time-Series Analysis of Per-Level GPA}
+	Using observed CGPA100--CGPA400, mean GPA trajectories were computed by programme and by year of graduation. Each student contributes one GPA per level; group lines are cross-sectional means at each level, not a single cohort tracked over calendar time. Programme heatmaps and boxplots (notebook Section~4 and Streamlit Trajectory tab) show heterogeneity across programmes and levels---for example, relative ordering of programmes at Level~400. These analyses use only observed per-level GPAs and do not depend on synthesized predictors.
+	
+	\section{Predictive Use Case}
+	The scoring utility accepts new rows with the predictors in Table~\ref{tab:data-sources} and returns \texttt{predicted\_CGPA}. Example: a student with CGPA100--300 means implying \textit{Previous\_GPA} $\approx 3.37$, attendance 85\%, 10 study hours per week, 12 courses, and genotype AA receives a predicted CGPA of approximately 3.55 under the refitted model. The Streamlit \textit{Predict \& CV} tab exposes the same logic interactively.
+	
+	\section{Summary of Findings}
+	\begin{itemize}
+		\item Prior three-year academic performance (\textit{Previous\_GPA}) is the dominant linear predictor of final CGPA.
+		\item Synthesized attendance and study hours show weak positive associations; practical effect sizes are small once \textit{Previous\_GPA} is controlled.
+		\item Course load and synthesized genotype add negligible explanatory power in this specification.
+		\item Out-of-sample errors are low (MAE $\approx 0.11$ on a 5-point scale) but largely reflect lagged GPA information.
+		\item Per-level trajectory analysis reveals programme and cohort patterns in observed GPA series.
+	\end{itemize}
+	
+	\section{Limitations of the Results}
+	\label{sec:limitations-results}
+	\textbf{L1 (Endogeneity):} Attendance and study hours retain 40\% CGPA-linked structure in synthesis; significant coefficients do not prove causal effects. \textbf{L2 (Overlap):} \textit{Previous\_GPA} shares components with CGPA; adjusted $R^2$ is not a pure behavioural explanation. \textbf{L3 (Synthesis):} Behavioural and load variables were not measured. \textbf{L4 (Overload):} 5\% overload rate is assumed. \textbf{L5 (IDs):} Duplicate ID collisions in source data. \textbf{L6 (Context):} MTU-specific calibration. \textbf{L7 (Genotype):} Genotype is simulated, not clinically recorded. Results are illustrative for methodology demonstration and institutional discussion, not registrar-certified forecasting without observed predictors.
 	
 \end{document}
