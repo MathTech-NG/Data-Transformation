@@ -9,7 +9,7 @@ It is the first thing an agent should read after AGENTS.md.
 ## Current State (as of Session 3)
 
 **Pipeline status:** STABLE — all 34 verify.py checks pass  
-**Active branch of work:** Data engineering complete. Ready for modelling.  
+**Active branch of work:** Prediction layer shipped (`predict.py`, `score.py`, `prediction_common.py`, Streamlit tab **Predict & CV**).  
 **Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 14 columns  
 
 ### Dataset summary
@@ -89,11 +89,12 @@ discussing predictor selection.
 - [x] verify.py 34-check suite passing
 - [x] README.md with full methodology and honest limitations (L1–L6)
 - [x] AGENTS.md, memory.md, context.md, init.sh created
+- [x] Prediction layer: `prediction_common.py`, `predict.py`, `score.py`, notebook §3.6, Streamlit Predict & CV tab
 
 ## Next Steps
 
 - [ ] Resolve OQ-1 (DV reframe) with Kelvin and supervisor
-- [ ] Build OLS regression script on enriched dataset
-- [ ] Build time-series modelling script (per-student CGPA trajectory)
+- [ ] Build time-series modelling script (per-student CGPA trajectory) if still required beyond notebook
 - [ ] Generate descriptive statistics table for paper methodology section
 - [ ] Write methodology section language citing L1–L6 limitations explicitly
+- [x] Out-of-sample CV (`predict.py`) and batch scoring (`score.py`) with README + notebook Section 3.6

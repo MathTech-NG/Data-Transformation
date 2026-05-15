@@ -136,3 +136,22 @@ These six limitations (L1–L6) must appear in any paper using this dataset:
 - **L4** — Overload rate (5%) and ceiling (20 courses) are unverified assumptions
 - **L5** — 70 ID collisions in source data
 - **L6** — Parameters calibrated for Nigerian university context only
+
+---
+
+## §7. Prediction layer (secondary goal)
+
+**Decision:** Ship `prediction_common.py`, `predict.py` (k-fold OLS MAE / RMSE / out-of-sample R²
+with optional `--also-cgpa400` exploratory block pending OQ-1), and `score.py` (batch CSV or JSON
+scoring with the same four predictors as `app.py`). Streamlit tab **Predict & CV** reuses the
+same helpers.
+
+**Input contract for scoring:** Each row must include `Attendance_Rate`, `Study_Hours_Per_Week`,
+`Course_Load`, and either `Previous_GPA` or all of `CGPA100`, `CGPA200`, `CGPA300` (previous GPA
+derived as in `enrich.py`). Extra columns are ignored with a printed warning; `SGPA` is not used as
+a predictor until OQ-4 is resolved.
+
+**Reason:** Separates honest out-of-sample error from in-sample Adj R²; provides an operational
+path for hypothetical or new rows without changing the synthesis or verify gates.
+
+**Resolved by:** Implementation session (prediction layer), May 2026.

@@ -6,8 +6,9 @@ Streamlit presentation layer for the Academic Performance Modelling project.
   Regression and Time Series Modelling of Students' Performance Across Semester
   Ehime Kelvin Ehinomen — Mountain Top University, Jan 2026
 
-Presentation only — does NOT refit the model on user input.
-Tabs: Data Overview | OLS Results | Trajectory Charts
+Presentation only — Tabs 1–3 display the full-sample OLS fit and charts.
+Tab 4 reports k-fold metrics and applies the same fitted equation to user inputs.
+Tabs: Data Overview | OLS Results | Trajectory Charts | Predict & CV
 
 Run:
     streamlit run app.py
@@ -25,6 +26,13 @@ from plotly.subplots import make_subplots
 import scipy.stats as stats
 import statsmodels.api as sm
 import streamlit as st
+
+from prediction_common import (
+    cross_val_ols_metrics,
+    prepare_scoring_features,
+    score_dataframe,
+    soft_validate_predictors,
+)
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────────────
 
@@ -140,10 +148,11 @@ std_resid    = resid / resid.std()
 
 # ─── TABS ─────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📊  Data Overview",
     "📈  OLS Results",
     "📉  Trajectory Charts",
+    "🔮  Predict & CV",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -548,3 +557,120 @@ with tab3:
         "Data source: `academic_performance_enriched.csv` — "
         "Ehime Kelvin Ehinomen, Mountain Top University, Jan 2026."
     )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — PREDICT & CV
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab4:
+    st.header("Prediction layer (secondary goal)")
+    st.caption(
+        "Out-of-sample metrics use k-fold cross-validation (same logic as `predict.py`). "
+        "Scores use the same OLS specification as Tab 2, fitted on this deduped dataset. "
+        "L1–L3 apply — illustrative only, not registrar-official forecasts."
+    )
+
+    k_cv = st.slider("CV folds (k)", min_value=3, max_value=10, value=5, step=1)
+    seed_cv = st.number_input("Random seed (CV splits)", value=42, step=1)
+
+    m_cv = cross_val_ols_metrics(df, "CGPA", k=int(k_cv), seed=int(seed_cv))
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("MAE (OOF)", f"{m_cv['mae']:.4f}")
+    c2.metric("RMSE (OOF)", f"{m_cv['rmse']:.4f}")
+    c3.metric("R² (OOF)", f"{m_cv['r2_oof']:.4f}")
+    c4.metric("Baseline MAE", f"{m_cv['baseline_mean_mae']:.4f}")
+    st.caption(
+        "Baseline = always predict each fold's training-set mean CGPA for held-out rows "
+        "(same k and seed)."
+    )
+
+    if st.checkbox("Show exploratory CGPA400 metrics (OQ-1)", value=False):
+        st.warning(
+            "CGPA400 metrics are for discussion only until Kelvin and supervisor approve "
+            "a dependent-variable reframe."
+        )
+        m4 = cross_val_ols_metrics(df, "CGPA400", k=int(k_cv), seed=int(seed_cv))
+        d1, d2, d3 = st.columns(3)
+        d1.metric("CGPA400 MAE", f"{m4['mae']:.4f}")
+        d2.metric("CGPA400 RMSE", f"{m4['rmse']:.4f}")
+        d3.metric("CGPA400 R² (OOF)", f"{m4['r2_oof']:.4f}")
+
+    st.divider()
+    st.subheader("Score new rows")
+    mode = st.radio("Input mode", ["Manual form", "CSV upload"], horizontal=True)
+
+    if mode == "Manual form":
+        mode_prev = st.radio(
+            "Prior GPA",
+            ["Enter Previous_GPA directly", "Derive from CGPA100 / 200 / 300"],
+            horizontal=True,
+        )
+        att = st.number_input(
+            "Attendance_Rate (%)", min_value=0.0, max_value=100.0, value=75.0, step=0.1
+        )
+        sh = st.number_input(
+            "Study_Hours_Per_Week", min_value=0.0, max_value=24.0, value=8.0, step=0.1
+        )
+        cl = st.number_input(
+            "Course_Load (# courses)", min_value=0, max_value=25, value=11, step=1
+        )
+        if mode_prev == "Enter Previous_GPA directly":
+            prev = st.number_input(
+                "Previous_GPA", min_value=0.0, max_value=5.0, value=3.2, step=0.01
+            )
+            raw_in = pd.DataFrame([{
+                "Previous_GPA": prev,
+                "Attendance_Rate": att,
+                "Study_Hours_Per_Week": sh,
+                "Course_Load": int(cl),
+            }])
+        else:
+            g1 = st.number_input(
+                "CGPA100", min_value=0.0, max_value=5.0, value=3.0, step=0.01
+            )
+            g2 = st.number_input(
+                "CGPA200", min_value=0.0, max_value=5.0, value=3.2, step=0.01
+            )
+            g3 = st.number_input(
+                "CGPA300", min_value=0.0, max_value=5.0, value=3.4, step=0.01
+            )
+            raw_in = pd.DataFrame([{
+                "CGPA100": g1,
+                "CGPA200": g2,
+                "CGPA300": g3,
+                "Attendance_Rate": att,
+                "Study_Hours_Per_Week": sh,
+                "Course_Load": int(cl),
+            }])
+        if st.button("Compute predicted CGPA"):
+            Xs, msgs = prepare_scoring_features(raw_in)
+            for msg in msgs:
+                st.info(msg)
+            for w in soft_validate_predictors(Xs):
+                st.warning(w)
+            pred = float(score_dataframe(model, Xs).iloc[0])
+            st.success(f"Predicted CGPA: **{pred:.4f}** (0–5 scale)")
+
+    else:
+        up = st.file_uploader(
+            "Upload CSV (see README / `examples/example_score_rows.csv`)", type=["csv"]
+        )
+        if up is not None:
+            raw_up = pd.read_csv(up)
+            try:
+                Xu, msgs = prepare_scoring_features(raw_up)
+                for msg in msgs:
+                    st.info(msg)
+                for w in soft_validate_predictors(Xu):
+                    st.warning(w)
+                pred_s = score_dataframe(model, Xu)
+                out_df = pd.concat([raw_up.reset_index(drop=True), pred_s], axis=1)
+                st.dataframe(out_df)
+                st.download_button(
+                    "Download scored CSV",
+                    data=out_df.to_csv(index=False).encode("utf-8"),
+                    file_name="scored_upload.csv",
+                    mime="text/csv",
+                )
+            except ValueError as e:
+                st.error(str(e))

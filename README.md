@@ -12,12 +12,14 @@ undergraduate academic performance at Mountain Top University. The study applies
 and time-series analysis to a real institutional dataset, supplemented by statistically
 synthesized variables where original records were unavailable.
 
-The pipeline proceeds in three stages:
+The pipeline proceeds in four stages:
 
 1. **Enrichment** — synthesize three missing independent variables and derive a lagged GPA predictor
 2. **Verification** — run a 34-check automated suite to confirm dataset integrity before modelling
 3. **Analysis** — OLS regression with full diagnostics, and CGPA trajectory analysis across
    Levels 100–400, delivered as a notebook (primary submission) and an interactive Streamlit app
+4. **Prediction (secondary)** — k-fold out-of-sample metrics (`predict.py`) and operational CGPA
+   scoring for new rows (`score.py`), using the same OLS specification as the notebook and app
 
 ---
 
@@ -29,9 +31,12 @@ The pipeline proceeds in three stages:
 │
 ├── enrich.py                             ← synthesizes missing variables, derives Previous_GPA
 ├── verify.py                             ← 34-check validation suite (must exit 0 before modelling)
+├── prediction_common.py                  ← shared OLS CV + scoring helpers
+├── predict.py                            ← k-fold out-of-sample MAE / RMSE / R² (optional CGPA400 block)
+├── score.py                              ← batch predictions (CSV or JSON) from refit reference OLS
 │
 ├── model.ipynb                           ← primary academic submission (notebook)
-├── app.py                                ← Streamlit presentation layer (3 tabs, display only)
+├── app.py                                ← Streamlit presentation layer (4 tabs, display only)
 ├── requirements.txt                      ← Python dependencies
 │
 ├── VARIABLE-SYNTHESIS.md                 ← full synthesis methodology and mathematical foundations
@@ -67,14 +72,31 @@ python enrich.py
 # 2. Verify all 34 checks pass (exit code must be 0)
 python verify.py
 
-# 3. Open the analysis notebook
+# 3. (Optional) Out-of-sample prediction metrics — k-fold OLS on enriched data
+python predict.py --seed 42
+# Exploratory Level-400 target only (OQ-1 — discuss with supervisor before using in the paper)
+python predict.py --seed 42 --also-cgpa400
+
+# 4. (Optional) Score new rows — CSV in, CSV out (same four predictors as the OLS model)
+#    Each row needs Attendance_Rate, Study_Hours_Per_Week, Course_Load, plus either
+#    Previous_GPA OR (CGPA100, CGPA200, CGPA300). Extra columns are ignored with a warning.
+python score.py --input examples/example_score_rows.csv --output scored_output.csv
+
+# 5. Open the analysis notebook
 jupyter notebook model.ipynb
 
-# 4. Launch the Streamlit presentation app
+# 6. Launch the Streamlit presentation app
 streamlit run app.py
 ```
 
 > Do not proceed to modelling if `verify.py` exits with code 1.
+
+**Scoring input contract:** The fitted model does **not** accept an arbitrary list of semester SGPA
+values. It uses `Previous_GPA` (= mean of CGPA100–300 in the enrichment definition) plus the three
+behavioural fields. Including `SGPA` as a predictor is an open research question (OQ-4 in
+`context.md`); `score.py` ignores unused columns and prints which were ignored.
+
+See `examples/example_score_rows.csv` for a minimal template.
 
 ---
 

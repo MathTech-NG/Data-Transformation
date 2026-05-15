@@ -1,0 +1,264 @@
+\documentclass[12pt]{report}
+
+% Packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{natbib}
+
+\geometry{margin=1in}
+\onehalfspacing
+
+\begin{document}
+	   
+	\chapter{Introduction}
+	
+	\section{Background of the Study}
+	
+	Education is a crucial part of the national development, and one of the most significant metrics applied to evaluate the competence of the educational systems is the academic performance of students. The Grade Point Average (GPA) is usually used to assess academic performance and offer a standardized measure of performance of students over a period. Following the GPA of students on different academic times allows one to identify the trends, consistency and patterns of performance.
+	
+	The recent years have witnessed an increasing interest in using quantitative methods in educational research. Specifically, Mathematical Modelling has become an effective means of modeling real-world problems in mathematical forms, and Statistical Analysis offers ways of interpreting information and making informed decisions in the uncertain world. By using these methods, researchers are able to go beyond the descriptive analysis and come out with predictive models that have the ability to predict the academic performance of students based on the predictable factors.
+	
+	The academic, behavioral, and physiological factors interact to affect academic performance. Of these, study habits, usually quantified in the number of average hours of study, are sensitive factors in determining the degree to which students acquire knowledge. Likewise, the attendance at classes has a significant influence since it indicates the level of student participation and exposure to instructional activities and these directly influence the learning outcomes. Moreover, the course load can influence the capability of students to manage time well and be able to perform consistently.
+	
+	In addition to these academic and behavioral variables, growing awareness is being given to the health related variables in determining the academic performance of students. The biological traits like genotype may affect the overall health status of a person. Indicatively, some genotypes can be linked to health issues, which could result in low attendance, poor concentration or disruption of studies. Consequently, the inclusion of this kind of variables in the academic performance models offers a more realistic and holistic explanation of the learning conditions of students.
+	
+	Although there are studies on the academic performance of students, a large proportion of the available studies consider individual factors or apply restricted methods of analysis. Not many studies embrace the use of an integrated modelling approach that incorporates various influencing variables in a single framework. This weakness minimizes the capacity to determine the intricate interactions among factors which influence academic performance.
+	
+	Hence, a more detailed and data-also-driven method of the combination of many determinants of academic performance in a single form of analysis is needed. This paper fills this gap by using mathematical modelling and statistical analysis methodologies to assess and predict academic performance of students using important variables like GPA, studying hours, attendance, and genotype. In this way, the proposed research will bring a better understanding of the dynamics of academic performance and help create forecasting tools that may be applied to the educational planning and intervention approaches.
+	
+	
+	
+	\section{Statement of the Problem}
+	
+	There are numerous aspects that determine the academic performance of students such as studying habits, classroom attendance, and health status. Most of the existing researches, however, are likely to investigate these factors separately and not the cumulative impact of the factors on the overall academic performance of the students. This disjointed methodology restricts a wholesome conception of the interaction of these variables to shape performance.
+	
+	Moreover, there are no systematic models that can serve efficiently in analyzing and predicting the academic performance of students based on a combination of multiple variables. Most of the conventional ones are based on the descriptive statistics that lack adequate predictive power and understanding of the relations between the major factors of influence.
+	
+	Moreover, the lack of unified datasets that combine academic, behavioral, and health-related data, including genotype, is a limitation to the creation of effective and trustworthy models. Such a gap prevents educators and institutions to detect at-risk students at an early stage and introduce interventions based on data.
+	
+	Consequently, a mathematical and statistical model that would combine various determining factors is necessary to effectively study and forecast academic performance of students.
+	
+	\subsection{Research Gap and Contribution}
+	Although there are numerous studies on the academic performance of the students, a number of gaps in the literature still remain. Most of the past researches have been inclined to look at individual factors like study habits or attendance separately, and not in a combination of both. This restricts a thorough examination of the interaction of the various academic, behavioral, and health-related factors to determine how these factors affect the performance of students.
+	
+	Moreover, majority of the studies that are available do not take into account the contribution of health-related factors like genotype. This exclusion makes the analysis incomplete, particularly where health status can be a major factor influencing academic activity of students, attendance, and their overall performance.
+	
+	In addition, many of the studies are based on descriptive statistical analysis not predictive modelling techniques. Consequently, these researches are unable to predict academic performance or give practical measures to intervene at the initial stages. The other important limitation is the lack of detailed datasets which capture all the important variables such as GPA in all semesters, hours of studying, attendance, and genotype. This complicates the process of coming up with strong and effective models.
+	
+	In addition, not all of the existing models are sufficiently tested on independent real-life data, and it is questionable as to how well they would perform in real-life environments and how representative they are.
+	
+	This research fills these gaps by coming up with an integrated model of prediction, which incorporates a combination of various factors of influence, such as GPA, hours of study, attendance, and genotype. The study offers explanatory and predictive information on the academic performance of students by using the Mathematical Modelling and Statistical Analysis, which is regression analysis.
+	
+	Moreover, the research presents genotype as an innovative variable, which, in turn, introduces an aspect of health-related approach that is frequently neglected in academic performance research. In order to address the limitations of data, both real-life and simulated data sets are used in the study to achieve completeness of variables but still retain realism.
+	
+	Lastly, the model developed is tested with independent real-life data, which increases its validity and practicality. The result of the study can be taken as a helpful predictive instrument that may help educators and academic organizations to recognize at-risk pupils and make evidence-based and rational decisions.
+	
+	\section{Aim and Objectives of the Study}
+	This study will focus on coming up with a mathematical and statistical model of analysing and predicting the academic performance of the students using a variety of factors that affect the performance of the students, including the study hours, attendance and genotype in this case.
+	
+	\begin{itemize}
+		\item To analyze students’ academic performance using GPA data across different academic periods.
+		\item To examine the relationship between academic performance and key factors such as study hours, attendance, and genotype.
+		\item To develop a regression-based mathematical model for predicting students’ academic performance.
+		\item To test the developed model on the real-life data and determine its predictive accuracy.
+	\end{itemize}
+	
+	\section{Methodology}
+	This study adopts a quantitative research approach to analyze and predict students’ academic performance using Mathematical Modelling and Statistical Analysis. The methodology involves the use of both real-life and simulated datasets to ensure completeness and reliability of the variables considered in the study.
+	
+	The data utilized include students’ Grade Point Average (GPA) across multiple semesters, average study hours per week, average attendance per semester, and genotype as a health-related factor. Where real-life data are incomplete, simulated data are generated to incorporate missing variables such as genotype, thereby ensuring a comprehensive dataset for analysis.
+	
+	Prior to analysis, data preprocessing techniques are applied. These include data cleaning, handling missing values, normalization of variables, and proper structuring of the dataset to make it suitable for modelling. The independent variables considered in this study are study hours, attendance, and genotype, while the dependent variable is students’ academic performance measured by GPA.
+	
+	A multiple regression model is employed to examine the relationship between the dependent and independent variables. The model is mathematically expressed as:
+	\subsection{Regression Model Specification}
+	
+	The multiple regression model used in this study is expressed as:
+	
+	\begin{equation}
+		Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \varepsilon
+	\end{equation}
+	
+	\subsection*{Where:}
+	
+	\begin{itemize}
+		\item $Y$ = Students’ academic performance (measured by GPA)
+		\item $X_1$ = Average study hours
+		\item $X_2$ = Average attendance
+		\item $X_3$ = Genotype
+		\item $\beta_0$ = Intercept (constant term)
+		\item $\beta_1, \beta_2, \beta_3$ = Regression coefficients
+		\item $\varepsilon$ = Error term
+	\end{itemize}
+	
+	This model shows that students’ academic performance depends on study hours, attendance, and genotype, while the error term captures other influencing factors not included in the model.
+	
+	\section{Significance of the Study}
+	This study is important since it is a contribution to the use of Mathematical Modelling and Statistical Analysis in the solution of educational problems on students academic performance. The study establishes a regression model prediction system that provides a systematic solution for analyzing the relationship between academic performance and factors affecting it (study hours, attendance, genotype).
+	The study is useful for students, teachers, researchers and institutions. As a study for students, the study aims to identify the factors that affect the success of a student's study and at the same time encourage students to improve their study habits and class participation. Developed model can be used as a decision support tool for educators/institutions to monitor students' progress and determine students who need academic intervention.
+	In addition, this study is an addition to the current literature that also combines academic, behavioral, and health variables in one analysis. Incorporating genotype adds another layer of consideration that's missing from studies around educational performance.
+	The study also illustrates the use of regression analysis and prediction modelling methods using computational software like Python or MATLAB. This reflects the trend in educational research and decision making to increasingly make use of information.
+	Lastly, the results and procedures of the present work could be used as a reference for future researchers related to academic performance prediction, education data analysis, and applied mathematical modelling.
+	\section{Overview of Methodology}
+	The methodology of this study is quantitative and prediction type research with Mathematical Modelling and Statistical Analysis techniques used to analyze and predict student academic performance. The methodology consists of gathering academic-related data from students such as GPA during each semester, semester attendance, number of courses taken, study hours and genotype.
+	
+	The gathered information is then processed to standardize its consistency and applicability for analysis, including steps like cleaning, organizing, encoding, and normalizing. Then a multiple linear regression model is developed to find the relationship between students' academic performance and selected independent variables.
+	
+	This regression model is executed with computational tools based on Python and trained with the simulated data and real life data. The model is then tested on other real-world data to assess its predictive power and reliability.
+	
+	At the end, statistical evaluation measures and graphical representations are used to analyse the performance of the model and to explain the relations between the variables taken into consideration in the study.
+	
+	\section{Organisation Of Study}
+	The research work is divided into five chapters for systematic and logical presentation of the study.
+	
+	Chapter One contains the general introduction to the study where the background of the study, statement of the problem, aim and objectives of the study, significance of the study, scope of the study, overview of the methodology and organization of the study is presented.
+	
+	The literature review and theoretical framework are discussed in Chapter Two. It provides a summary of relevant literature in the field of academic performance, study habits, attendance, genotype, regression analysis and predictive modelling methods of students. The chapter also includes discussion of the mathematical and statistical concepts that are important for the study and also the gaps identified in the existing research.
+	
+	The methodology used in the study is discussed in Chapter Three. It will present to you the research design, data collection methods, dataset preparation and pre-processing techniques, formulation of the regression model and implementation of the model using Python or MATLAB and model validation techniques utilized during the development of the predictive model.
+	
+	The results of implementing the model, statistical analysis, regression results, graphical visualization, and interpretation of results obtained from the developed predictive model are presented in Chapter Four.
+	
+	Lastly, Chapter Five concludes the study, summarizes the findings, highlights the limitation of the study and gives recommendations for future research and possible improvements of the developed model.
+	
+	\chapter{Literature Review and Mathematical Foundations}
+	\section{Introduction}
+	Several studies have investigated the factors influencing students’ academic performance using statistical and predictive approaches. This section systematically compares selected studies related to study habits, attendance, and predictive modelling techniques in education.
+	
+	One of the major areas of agreement among existing studies is that academic performance is influenced by measurable behavioral and environmental factors. A. Credé and N. R. Kuncel (2008) concluded that study habits, motivation, and time management significantly contribute to academic success. Similarly, R. M. Stinebrickner and T. Stinebrickner (2008) found that increased study hours positively affect students’ academic outcomes. In the same manner, J. H. Romer (1993) and D. E. Marburger (2006) agreed that class attendance plays a significant role in improving students’ GPA and overall academic achievement.
+	
+	Another point of consensus among these studies is the importance of quantitative analysis in educational research. Most of the reviewed studies employed statistical techniques such as descriptive statistics, correlation analysis, and regression models to establish relationships between academic performance and influencing variables. This demonstrates the growing relevance of Statistical Analysis in educational performance evaluation.
+	
+	Despite these similarities, some direct debates and conflicting findings exist in the literature. While R. M. Stinebrickner and T. Stinebrickner (2008) argued that study hours have a strong causal relationship with academic performance, other studies suggest that study time alone is insufficient for accurately predicting students’ outcomes. Some researchers emphasize that attendance, motivation, learning environment, and psychological factors may jointly influence performance rather than acting independently. This creates debate regarding the most significant predictors of academic achievement.
+	
+	Similarly, studies on attendance present varying conclusions regarding the magnitude of its impact. J. H. Romer (1993) reported a strong relationship between attendance and academic success, whereas some later studies found that attendance alone may not guarantee high performance if effective study habits are absent. These conflicting findings suggest that academic performance is multidimensional and cannot be explained adequately using a single variable.
+	
+	The methodological approaches adopted by these studies may explain many of the observed differences. Some studies rely primarily on descriptive statistics and correlation analysis, while others employ advanced predictive methods such as regression analysis and educational data mining. Studies using simple descriptive methods often provide general observations but lack predictive capability. In contrast, regression-based studies establish stronger mathematical relationships between variables and provide forecasting ability.
+	
+	Another methodological difference lies in the datasets used by researchers. Several studies depend on small or institution-specific datasets, limiting the generalizability of their findings. Others rely on self-reported study hours and attendance records, which may introduce measurement bias. Furthermore, most existing studies exclude health-related variables such as genotype, thereby overlooking potential biological influences on academic performance.
+	
+	Regression analysis remains one of the most widely adopted approaches in educational predictive modelling because it allows multiple variables to be analyzed simultaneously. The general multiple regression equation used in educational prediction studies is expressed as:
+	
+	\[
+	Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \cdots + \beta_n X_n + \varepsilon
+	\]
+	
+	Where:
+	
+	\begin{align*}
+		Y & = \text{Academic performance} \\
+		X_1, X_2, \ldots, X_n & = \text{Independent variables such as study hours and attendance} \\
+		\beta_0 & = \text{Intercept} \\
+		\beta_1, \beta_2, \ldots, \beta_n & = \text{Regression coefficients} \\
+		\varepsilon & = \text{Error term}
+	\end{align*}
+	
+	The reviewed studies collectively demonstrate that academic performance prediction requires a multidimensional and integrated modelling approach. However, there remains a gap in combining academic, behavioral, and health-related variables within a single predictive framework. This study addresses that limitation by integrating GPA, study hours, attendance, and genotype into a regression-based predictive model validated using real-life data.
+	\section{Academic Performance Assessment}
+	Academic performance is the measure of students' success in their learning experiences and evaluations. Usually it is determined by the Grade Point Average (GPA), examination performance and overall record of academic achievement. Student academic achievement is frequently considered as evidence of their learning, engagement and persistence in learning activities.
+	
+	In addition to intelligence, academic performance depends on behavior and environment factors like time management, class participation and study habits (A. Credé and N. R. Kuncel, 2008). Their research highlighted the importance of cognitive and non-cognitive factors contributing to academic achievement.
+	
+	Academic performance analysis is a crucial tool for educational institutions that aims to assess the effectiveness of the curriculum, the quality of teaching, and the engagement of students. Academic analysis that is accurate enables the institutions to identify students in need of academic support and helps teachers to come up with intervention measures.
+	
+	While academic performance evaluation is always of great importance, traditional methods of academic performance evaluation are usually using descriptive methods which are not capable of capturing the complex relationships between influencing variables. This restriction has led to the use of techniques that have come into use in the field of educational research, such as predictive modelling and statistical analysis.
+	\section{Study Hours and Academic Performance}	
+	Factors that are likely studied that affect academic achievement include study habits and study duration. Study hours are time spent by students in studying activities outside of the regular class time. Good Study Skills promote knowledge, understanding and examination performance.
+	
+	R. M. Stinebrickner, T. Stinebrickner (2008) studied the link between study time and academic achievement and decided that prolonged academic study time positively affects students' academic results. They found that pupils who put in regular and significant time into their studies are more likely to get better academic outcomes.
+	
+	Likewise, A. Credé and N. R. Kuncel (2008) found that good study skills were significantly linked to increased GPAs and academic stability.
+	
+	Several studies do highlight, however, that study time is not the only factor to consider when determining academic achievement; attendance, motivation, health and environment also play a role. This implies the need for a combination of multiple variables and for integrated models as opposed to models involving only one variable as their sole focus.
+	\section{Attendance and Academic Performance}
+	Attendance is a reflection of student involvement and participation in school activities. Good attendance ensures that students have access to lecture, discussion, practical and interaction that improves their learning outcomes.
+	
+	J. H. Romer (1993) studied the connection between school attendance and academic performance, and he found that students who are on a regular attendance schedule do better than those who have poor attendance records. Likewise, D. E. Marburger (2006) discovered that students' academic achievement is enhanced by required attendance.
+	
+	Attendance is a key factor in academic achievement, enhancing learners' access to learning materials and minimizing learning gaps. Frequent absences can cause students to fall behind in their coursework and therefore will not perform as well in the class.
+	
+	While there has been demonstrated evidence that it is a positive factor in children's academic achievement, many studies only examine attendance, and not encompass other factors like study habits or health-related issues. This will result in a partial report of students' learning.
+	\section{Health and Academic Performance}
+	Students' productivity, concentration and engagement in school learning is significantly influenced by their health conditions. Illness may impact on attendance, regularity in studies, and the effectiveness of learning.
+	
+	Genotype is one factor of health that is important to this study. Genotype is the genotype of an individual, which is usually represented as AA, AS or SS. There are health issues that could impair students' ability to participate in educational activities for students with some genotype conditions, especially sickle cell-related conditions.
+	
+	The World Health Organization (2020) stated that sickle cell diseases have negative impact on health status which can impact productivity, attendance and day-to-day functioning. These may have indirect effects on learning.
+	
+	Although there may be a linkage between genotype and academic achievement, many studies on education do not incorporate health-related factors in prediction models. Existing studies are mainly limited to academic and behavioral factors, leaving out other variables, and this represents a gap in the literature.
+	
+	Considering the genotype aspect in this study brings new and more complex dimension to academic performance analysis.
+	\section{Mathematical Modelling}
+	Mathematical modelling is the act of using mathematical models to represent real-world systems and relationships in terms of mathematical expressions and equations. Models are used by researchers to help them simplify complex systems, to analyze the relationship between variables and to predict.
+	
+	Mathematical models are employed in educational research to investigate students' performance, learning behaviors, and effectiveness of the educational institution. Mathematical models are a systematic way to explain the relationship between various variables and academic outcomes.
+	
+	In this research, the use of mathematical modelling enables academic achievement to be represented by a function of various influencing variables including study hours, attendance and genotype. This will allow predictive models to be developed which can estimate students' future academic performance.
+	
+	The transformational value of mathematical modelling is especially pronounced, as it allows the education data to be measurable and interpretable, thus facilitating data-driven decisions.
+	\section{Statistical Analysis in Educational Research}
+	The analysis of data is called statistical analysis and is concerned with collecting, organising, interpreting and presenting the data. In education research, statistics have been commonly employed for analyzing students' performance, detecting trends, and determining the relationship among the variables.
+	
+	Descriptive statistics, correlation analysis, hypothesis testing, and regression analysis are common data analysis techniques employed in educational research. Descriptive statistics include measures of central tendency (mean, median, and standard deviation) and correlation analysis measures the strength of relationships between variables.
+	
+	Through the use of statistical analysis, researchers are able to transcend observation and make evidence-based decisions about academic performance. Use of statistical methods also enhances reliability and validity of research findings.
+	
+	The statistical analysis in this study offers a quantitative approach to analyzing the impact of the selected variables on academic performance.
+	
+	\section{Regression Analysis}
+	Regression analysis is a statistical technique used to examine relationships between dependent and independent variables. It is widely used for prediction and forecasting in various fields, including education, economics, engineering, and health sciences.
+	
+	According to D. C. Montgomery, E. A. Peck, and G. G. Vining (2012), regression analysis provides a mathematical framework for estimating the effect of multiple variables on a specific outcome.
+	
+	The regression model used in this study is represented as:
+	
+	\[
+	Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \varepsilon
+	\]
+	
+	Where:
+	
+	\begin{align*}
+		Y & = \text{Students' academic performance (GPA)} \\
+		X_1 & = \text{Study hours} \\
+		X_2 & = \text{Attendance} \\
+		X_3 & = \text{Genotype} \\
+		\beta_0 & = \text{Intercept} \\
+		\beta_1, \beta_2, \beta_3 & = \text{Regression coefficients} \\
+		\varepsilon & = \text{Error term}
+	\end{align*}
+	
+	Regression analysis is suitable for this study because it allows multiple factors to be analyzed simultaneously while also providing predictive capability.
+	
+	\section{Predictive Modelling in Education}
+	Predictive modelling is the process of using statistical or computational methods to predict future outcomes based on past data. The key value in using educational predictive models is their ability to predict students' academic outcomes, to assist in identifying students who may be at risk, and to help institutions plan more effectively.
+	
+	C. Romero and S. Ventura (2010) have pointed out the increasing significance of the learning data mining and predictive analysis in learning systems. Likewise, A. M. Shahiri, W. Husain, and N. A. Rashid (2015) stated that predictive models can enhance the monitoring and intervention processes in the academic field.
+	
+	Predictive modelling is used to identify students who are at risk of academic difficulties early. This allows institutions to take corrective action in good time before the performance starts to suffer.
+	
+	\section{Research Gap}
+	Despite the numerous studies conducted on students’ academic performance, several important gaps still exist in the literature. Most previous studies focus on individual factors such as study habits, attendance, or socio-economic background independently, without integrating multiple influencing variables into a unified analytical framework. As a result, many existing models fail to provide a comprehensive understanding of the combined effects of academic, behavioral, and health-related factors on students’ performance.
+	In addition, many studies rely primarily on descriptive statistical methods and correlation analysis, which explain relationships between variables but offer limited predictive capability. Although some researchers have applied regression analysis and predictive modelling techniques, many of these models are developed using limited datasets and are not adequately validated using independent real-life data. This reduces their reliability and practical applicability in real educational environments.
+	Another major gap identified in the literature is the exclusion of health-related variables such as genotype. Existing studies rarely consider biological or health conditions that may influence students’ attendance, concentration, productivity, and overall academic engagement. Consequently, current predictive models may not fully capture important factors affecting students’ academic performance.
+	Furthermore, many educational performance studies utilize datasets that are incomplete or institution-specific, thereby limiting the generalizability of their findings. The absence of integrated datasets containing academic, behavioral, and health-related variables creates challenges in developing robust predictive systems.
+	Therefore, this study seeks to address these gaps by developing a regression-based predictive model that integrates multiple variables, including GPA, study hours, attendance, and genotype. The study also combines simulated and real-life datasets and validates the developed model using independent real-world data to improve reliability, accuracy, and practical relevance.
+	
+	\section{Theoretical Framework}
+	The theory used for this study is regression analysis and predictive modelling because it is a systematic approach in statistics applied to analyze the relationship between the dependent variable and an independent variable or more than one independent variable. The theory of regression is frequently used in the educational research due to its ability to determine, measure and predict the influence of various factors on academic performance.
+	
+	This study has a theoretical assumption that the achievement in student learning is not just by chance but is significantly influenced by the measurable variables such as genotype, student attendance and student study time. These are deemed to be important predictors as they are related to academic behaviour, level of engagement in learning activities and biological characteristics that might indirectly impact learning capacity and performance.
+	
+	The framework is based on the functional relationship between the dependent variable (Grade Point Average (GPA) of the students) and the selected independent variables, modeled using a multiple regression model. In this relationship, GPA is the dependent variable, and study hours, attendance and genotype are independent variables for which variations in students' academic achievement can be explained.
+	
+	The study also assumes that the changes in the independent variables could result in changes in academic performance. For example, more study time and class attendance should have a positive impact on student's GPA, and genotype might be affected by different health and physiological factors. These relationships can be statistically measured with respect to their strength, direction and significance by regression analysis.
+	
+	Secondly, predictive modelling can be used to predict students' future academic performance with existing information. This will enable the study to not only capture relationships among the variables, but also to forecast academic performance based on the observed relationships. The model's predictive ability improves the decision-making process for teaching and learning planning and evaluation.
+	
+	Thus, the framework offers the mathematical and statistical underpinning for understanding the relationships between variables, for testing of hypotheses, and for the generation of predictive models that can accurately and reliably estimate students' academic outcomes with a reasonable level of accuracy.
+	
+	\chapter{Methodology: Design and Implementation}
+	
+\end{document}
