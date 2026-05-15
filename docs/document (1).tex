@@ -6,6 +6,8 @@
 \usepackage{setspace}
 \usepackage{geometry}
 \usepackage{natbib}
+\usepackage{tabularx}
+\usepackage{array}
 
 \geometry{margin=1in}
 \onehalfspacing
@@ -81,6 +83,12 @@
 		Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \varepsilon
 	\end{equation}
 	
+	This introductory specification captures the three core behavioural
+	predictors described in the research objectives. The full empirical
+	model fitted in Chapter~3 extends this to seven terms, adding lagged
+	academic performance (\textit{Previous\_GPA}), course load, and a
+	genotype-attendance interaction term for SS students.
+	
 	\subsection*{Where:}
 	
 	\begin{itemize}
@@ -94,8 +102,6 @@
 	\end{itemize}
 	
 	This model shows that students’ academic performance depends on study hours, attendance, and genotype, while the error term captures other influencing factors not included in the model.
-	
-	The empirical implementation at Mountain Top University extends this introductory specification with two additional constructs grounded in the available registrar data: a lagged cumulative GPA (\textit{Previous\_GPA}) derived from per-level grades, and \textit{Course\_Load} measured as the number of courses registered per semester. Chapter~3 presents the full operational model fitted to the enriched dataset.
 	
 	\section{Significance of the Study}
 	This study is important since it is a contribution to the use of Mathematical Modelling and Statistical Analysis in the solution of educational problems on students academic performance. The study establishes a regression model prediction system that provides a systematic solution for analyzing the relationship between academic performance and factors affecting it (study hours, attendance, genotype).
@@ -220,6 +226,13 @@
 	Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \varepsilon
 	\]
 	
+	This general form is consistent with the specification adopted across
+	the reviewed literature. The empirical implementation in Chapter~3
+	extends it with two additional constructs grounded in the available
+	registrar data: lagged cumulative GPA (\textit{Previous\_GPA}) and
+	\textit{Course\_Load}, plus a health-pathway interaction for
+	haemoglobin genotype SS students.
+	
 	Where:
 	
 	\begin{align*}
@@ -278,16 +291,17 @@
 		\centering
 		\caption{Classification of variables in the enriched dataset}
 		\label{tab:data-sources}
-		\begin{tabular}{llp{7cm}}
+		\small
+		\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X@{}}
 			\hline
 			\textbf{Class} & \textbf{Variables} & \textbf{Notes} \\
 			\hline
-			Observed & ID, programme, gender, YoG, CGPA, CGPA100--400, SGPA & From registrar records; no missing values \\
-			Derived & Previous\_GPA & Mean of CGPA100, CGPA200, CGPA300 (lagged three-year average) \\
-			Synthesized & Attendance\_Rate, Study\_Hours\_Per\_Week, Course\_Load, Genotype & Not in source export; generated in \texttt{enrich.py} \\
-			Derived (trajectory) & Trajectory\_Slope, Trajectory\_Class & Per-student OLS slope across CGPA100--400 \\
+			Observed & ID, programme, gender, YoG, CGPA, CGPA100--400, SGPA & From registrar records; no missing values. \\
+			Derived & Previous\_GPA & Mean of CGPA100, CGPA200, CGPA300 (lagged three-year average). \\
+			Synthesized & Attendance\_Rate, Study\_Hours\_Per\_Week, Course\_Load, Genotype & Not in source export; generated in \texttt{enrich.py}. \\
+			Derived (trajectory) & Trajectory\_Slope, Trajectory\_Class & Per-student OLS slope and class (Improving / Stable / Declining) across CGPA100--400. \\
 			\hline
-		\end{tabular}
+		\end{tabularx}
 	\end{table}
 	
 	Attendance, weekly study hours, course load, and haemoglobin genotype were absent from the historical export and could not be recovered retrospectively. They were synthesized under documented assumptions (Sections~\ref{sec:synthesis}--\ref{sec:genotype-synth}). CGPA and per-level GPAs are treated as observed administrative outcomes on MTU's 0--5 scale.
@@ -326,7 +340,14 @@
 	\section{Regression Model Specification}
 	The empirical multiple linear regression model is:
 	\begin{equation}
-		\text{CGPA400}_i = \beta_0 + \beta_1 \text{Previous\_GPA}_i + \beta_2 \text{Attendance}_i + \beta_3 \text{StudyHours}_i + \beta_4 \text{CourseLoad}_i + \beta_5 D_{\text{AS},i} + \beta_6 D_{\text{SS},i} + \beta_7 (D_{\text{SS},i} \times \text{Attendance}_i) + \varepsilon_i,
+		\begin{split}
+			\text{CGPA400}_i ={} & \beta_0 + \beta_1 \text{Previous\_GPA}_i
+				+ \beta_2 \text{Attendance}_i + \beta_3 \text{StudyHours}_i \\
+			& + \beta_4 \text{CourseLoad}_i + \beta_5 D_{\text{AS},i}
+				+ \beta_6 D_{\text{SS},i} \\
+			& + \beta_7 \bigl(D_{\text{SS},i} \times \text{Attendance}_i\bigr)
+				+ \varepsilon_i,
+		\end{split}
 		\label{eq:full-model}
 	\end{equation}
 	where $D_{\text{AS}}$ and $D_{\text{SS}}$ are one if genotype is AS or SS respectively, and zero otherwise (reference: AA). Equation~(\ref{eq:full-model}) extends the three-predictor specification in Chapter~1 with lagged academic history, course load, and a health-pathway interaction for SS students.
@@ -354,7 +375,7 @@
 	This chapter presents descriptive statistics, correlation structure, OLS estimates, regression diagnostics, out-of-sample predictive metrics, and time-series views of per-level GPA. All numerical results below were produced from \texttt{academic\_performance\_enriched.csv} after ID de-duplication ($n = 2{,}974$) with the pipeline described in Chapter~3.
 	
 	\section{Data Presentation}
-	Table~\ref{tab:descriptive} summarizes key numeric variables. CGPA averages 3.50 (SD 0.69) on the 0--5 scale. Synthesized genotype counts were AA = 2,209 (74.3\%), AS = 733 (24.6\%), and SS = 32 (1.1\%), consistent with the multinomial priors. Students span 17 programmes and graduation years 2010--2014.
+	Table~\ref{tab:descriptive} summarizes key numeric variables. CGPA averages 3.50 (SD 0.69) on the 0--5 scale. Synthesized genotype counts were AA = 2,265 (74.4\%), AS = 742 (24.4\%), and SS = 39 (1.3\%), consistent with the multinomial priors ($P(\text{AA})=0.75$, $P(\text{AS})=0.24$, $P(\text{SS})=0.01$). The deduplicated modelling sample ($n = 2{,}974$) contains AA = 2,214, AS = 723, and SS = 37 students. Students span 17 programmes and graduation years 2010--2014.
 	
 	\begin{table}[htbp]
 		\centering
@@ -375,9 +396,14 @@
 	
 	\section{Correlation Structure}
 	Pearson correlations with CGPA400 were: \textit{Previous\_GPA} $r = 0.803$; \textit{Attendance\_Rate} $r = 0.237$; \textit{Study\_Hours\_Per\_Week} $r \approx 0.24$; \textit{Course\_Load} $r \approx -0.03$. The association for \textit{Previous\_GPA} is strong but no longer definitional (unlike $r = 0.976$ with overall CGPA). Legacy correlation with overall CGPA remains documented for comparison (Limitation L2).
+	Despite this marginal bivariate correlation, \textit{Study\_Hours\_Per\_Week}
+	was not significant in the full OLS model ($\hat{\beta}_3 \approx 0.001$,
+	$p = 0.875$), consistent with the dominant influence of
+	\textit{Previous\_GPA} absorbing most of the explainable variance once
+	conditioning is applied.
 	
 	\section{Regression Results}
-	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.646$. \textit{Previous\_GPA} has $\hat{\beta}_1 \approx 0.916$ ($p < 0.001$): a one-point increase in the three-year mean is associated with approximately a 0.92-point higher CGPA400, holding other predictors fixed. \textit{Attendance\_Rate} is positive and significant ($\hat{\beta}_2 \approx 0.005$, $p < 0.001$). Study hours, course load, genotype dummies, and the SS$\times$attendance interaction are not significant at $\alpha = 0.05$ in this sample, consistent with weak synthesis signal and small SS counts ($n_{\text{SS}} = 32$).
+	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.646$. \textit{Previous\_GPA} has $\hat{\beta}_1 \approx 0.916$ ($p < 0.001$): a one-point increase in the three-year mean is associated with approximately a 0.92-point higher CGPA400, holding other predictors fixed. \textit{Attendance\_Rate} is positive and significant ($\hat{\beta}_2 \approx 0.005$, $p < 0.001$). Study hours, course load, genotype dummies, and the SS$\times$attendance interaction are not significant at $\alpha = 0.05$ in this sample, consistent with weak synthesis signal and small SS counts ($n_{\text{SS}} = 37$).
 	
 	\begin{table}[htbp]
 		\centering
@@ -426,5 +452,57 @@
 	\section{Limitations of the Results}
 	\label{sec:limitations-results}
 	\textbf{L1 (Endogeneity):} Attendance and study hours retain CGPA-linked structure in synthesis; significant coefficients do not prove causal effects. \textbf{L2 (Overlap):} Primary DV is CGPA400 (no overlap with \textit{Previous\_GPA}); overall CGPA remains overlapping if used. \textbf{L3 (Synthesis):} Behavioural and load variables were not measured. \textbf{L4 (Overload):} 5\% overload rate is assumed. \textbf{L5 (IDs):} Duplicate ID collisions in source data. \textbf{L6 (Context):} MTU-specific calibration. \textbf{L7 (Genotype):} Genotype and attendance shifts are simulated, not clinically recorded. Results are illustrative for methodology demonstration and institutional discussion, not registrar-certified forecasting without observed predictors.
+	
+	\chapter{Conclusion}
+	
+	\section{Introduction}
+	This chapter summarises the principal findings of the study, discusses their implications for institutional and methodological practice, acknowledges the limitations under which the results must be interpreted, and presents recommendations for future research. It draws together the regression, predictive validation, and time series analyses presented in Chapters~3 and~4 into a coherent closing account of what was achieved and what remains to be done.
+	
+	\section{Summary of Findings}
+	Prior academic performance (\textit{Previous\_GPA}, the mean of Level~100--300 GPAs) was the strongest linear predictor of Level~400 GPA (CGPA400), with coefficient $\hat{\beta}_1 = 0.916$ ($p < 0.001$). This confirms that academic momentum is the primary driver of final-year outcomes, consistent with the broader educational research literature on cumulative performance.
+	
+	\textit{Attendance\_Rate} was the only behavioural variable to achieve statistical significance ($\hat{\beta}_2 = 0.005$, $p < 0.001$). While the effect size is small in absolute terms---a one percentage-point increase in attendance is associated with a 0.005-point increase in CGPA400---the finding is directionally consistent with the literature reviewed in Chapter~2 and supports the inclusion of attendance as a meaningful covariate. Study hours, course load, and genotype dummies were not significant at $\alpha = 0.05$, consistent with the weak synthesis signal and the small SS subsample ($n_{\text{SS}} = 37$ in the modelling sample).
+	
+	The decision to reframe the dependent variable from overall CGPA to CGPA400 reduced the adjusted $R^2$ from approximately 0.95 to 0.646, eliminating the arithmetic overlap between \textit{Previous\_GPA} and the outcome. Five-fold cross-validation yielded out-of-fold MAE $= 0.378$ and RMSE $= 0.478$ on a 0--5 scale, representing a 42\% reduction in mean absolute error relative to the naive baseline (MAE $= 0.652$). This is an honest and reproducible predictive result.
+	
+	The AR(1) panel model fitted on stacked level-GPA transitions ($n = 8{,}922$ observations from 2,974 students) yielded an autoregressive coefficient $\hat{\phi}_1 = 0.773$ ($p < 0.001$, $R^2 = 0.553$). This quantifies academic momentum: a student performing one GPA point above the cohort mean in a given level is expected to perform approximately 0.77 points above the mean in the following level. The Mann-Kendall test on the cohort-mean level series found no monotonic trend ($\tau = 0$, $p = 1.0$), consistent with the observed non-linear pattern---a dip at Level~200 (mean GPA $= 3.322$) relative to Level~100 ($3.635$), followed by recovery at Level~300 ($3.421$) and Level~400 ($3.533$). Trajectory classification identified 1,168 improving students (39.3\%), 1,242 declining students (41.8\%), and 564 stable students (19.0\%) at a $\pm 0.05$ slope threshold.
+	
+	The health-pathway genotype inclusion---in which SS students were assigned a mean attendance penalty of 7.7 percentage points relative to AA students under the synthesis assumptions---produced the expected directional pattern in the data. The SS $\times$ Attendance interaction term ($\hat{\beta}_7 = -0.004$, $p = 0.671$) was not significant, which is attributed to the small SS subsample rather than absence of the pathway. This result is illustrative and consistent with the stated design intent; it does not constitute clinical evidence of a genotype effect on academic performance.
+	
+	\section{Implications of the Study}
+	The dominance of \textit{Previous\_GPA} as a predictor suggests that early identification of students with declining Level~100--200 trajectories could enable timely intervention before Level~400. The AR(1) coefficient of 0.773 means that academic underperformance is persistent but not deterministic: there is meaningful variance left unexplained, giving intervention programmes room to operate.
+	
+	The study demonstrates the importance of choosing a dependent variable carefully. Using overall CGPA inflated $R^2$ to approximately 0.95 due to arithmetic overlap; switching to CGPA400 produced a more honest model that better represents a genuine prediction problem. Future studies in similar settings should attend to this distinction.
+	
+	By combining regression analysis with time series methods (AR(1), trajectory slopes, and the Mann-Kendall trend test on cohort means) in a single reproducible pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{model.ipynb}), the study provides a more complete characterisation of academic performance dynamics than either method alone would permit.
+	
+	\section{Limitations of the Study}
+	\textbf{L1 --- Residual endogeneity.} Attendance and study hours were synthesized with a 40\% CGPA-linked component. Although the blended design reduces tautological regression, the significant attendance coefficient cannot be interpreted as causal evidence. Observed attendance records from the institution's registry would be required to make a causal claim.
+	
+	\textbf{L2 --- Previous\_GPA and CGPA overlap (resolved for primary DV).} The primary dependent variable CGPA400 has no arithmetic overlap with \textit{Previous\_GPA}. However, if overall CGPA were used as the DV, the overlap would return and inflate $R^2$ artificially, as demonstrated by the legacy comparison ($R^2 \approx 0.95$). Researchers adopting similar designs should be alert to this distinction.
+	
+	\textbf{L3 --- Synthesized behavioural variables.} \textit{Attendance\_Rate}, \textit{Study\_Hours\_Per\_Week}, and \textit{Course\_Load} were not recorded in the source dataset and were generated under documented statistical assumptions. The enriched dataset should be treated as a methodology demonstration, not as a record of actual student behaviour.
+	
+	\textbf{L4 --- Overload rate assumption.} Approximately 5\% of students were assigned an approved course overload (16--20 courses) based on an assumed institutional rate, not a verified registrar figure. This affects \textit{Course\_Load} distributions for a small subset of students.
+	
+	\textbf{L5 --- Duplicate ID collisions.} The source dataset contained 72 duplicate \textit{ID No} entries across students with different programme codes, genders, or graduation years, indicating data-entry errors in the original registrar export. De-duplication retained the first occurrence ($n = 2{,}974$ for regression), but the underlying ID collision issue cannot be resolved without access to the original registrar system.
+	
+	\textbf{L6 --- Institutional specificity.} All synthesis parameters (programme load distributions, attendance means, genotype priors) were calibrated for Mountain Top University and the Nigerian population context. The model is not directly transferable to other institutions without re-calibration.
+	
+	\textbf{L7 --- Synthesized genotype and low SS power.} Haemoglobin genotype was not available in the registrar export and was assigned by multinomial draw. The health-pathway attendance shift for SS students is an assumed relationship grounded in the sickle cell literature, not a clinically verified one. With only 37 SS students in the modelling sample, the SS $\times$ Attendance interaction term has insufficient statistical power to detect a meaningful effect even if one exists. A study specifically designed to test this hypothesis would require a larger and clinically verified sample.
+	
+	\section{Recommendations for Future Research}
+	\begin{enumerate}
+		\item \textbf{Collect observed behavioural data.} The most direct improvement would be to replace synthesized attendance and study hours with observed records from the institution's learning management system or attendance registers. This would allow the regression coefficients to be interpreted as genuine behavioural associations rather than illustrative ones.
+		
+		\item \textbf{Expand the SS genotype sample.} The health-pathway genotype hypothesis could be properly tested with a dedicated dataset that includes clinical genotype records and sufficient SS representation (a minimum of 100--200 SS students is recommended for adequate power on the interaction term). Collaboration with the institution's health services would enable this.
+		
+		\item \textbf{Apply longitudinal time series methods.} The AR(1) analysis in this study used cross-sectional data---students were not tracked as a true cohort over calendar time. A longitudinal design following one or more intake cohorts from Level~100 through Level~400 would enable proper time series modelling with stationarity testing, seasonal decomposition, and cohort-level forecasting.
+		
+		\item \textbf{Extend to multi-institution datasets.} The current model is calibrated for Mountain Top University. Replicating the pipeline across multiple Nigerian universities---or universities in other contexts---would allow the generalisability of the findings to be assessed and the synthesis parameters to be grounded in cross-institutional data rather than a single-institution prior.
+	\end{enumerate}
+	
+	\section{Concluding Remarks}
+	This study set out to develop a mathematical and statistical model to analyse and predict student academic performance at Mountain Top University using integrated academic, behavioural, and health-related predictors. That aim was achieved through a reproducible pipeline combining OLS regression on CGPA400, $k$-fold cross-validation, AR(1) time series analysis on per-level GPA transitions, and per-student trajectory classification. The use of synthesized data where registrar records were incomplete is a limitation, but it was a deliberate methodological choice made transparent throughout Chapters~3--5. Quantitative modelling of this kind, when applied with appropriate caution about data provenance and dependent-variable design, can support evidence-informed educational planning and early identification of students who may benefit from institutional intervention.
 	
 \end{document}
