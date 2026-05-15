@@ -28,6 +28,8 @@ import statsmodels.api as sm
 import streamlit as st
 
 from prediction_common import (
+    COEF_LABELS,
+    DEFAULT_TARGET,
     DESIGN_COLUMNS,
     build_design_matrix,
     cross_val_ols_metrics,
@@ -81,7 +83,7 @@ def load_data() -> pd.DataFrame:
 
 @st.cache_resource
 def run_ols(_df: pd.DataFrame):
-    return fit_reference_ols(_df, target="CGPA")
+    return fit_reference_ols(_df, target=DEFAULT_TARGET)
 
 
 # ─── SIDEBAR — LIMITATIONS ────────────────────────────────────────────────────
@@ -94,10 +96,10 @@ LIMITATIONS = {
         "attendance or more study hours cause better outcomes. The paper must state this explicitly "
         "in the methodology section — not just in a limitations appendix."
     ),
-    "L2 — Arithmetic Overlap in Previous_GPA": (
-        "`Previous_GPA = mean(CGPA100, CGPA200, CGPA300)` shares three of four components with "
-        "the final `CGPA`. The Adj R² ≈ 0.953 is driven almost entirely by this definitional "
-        "relationship, not by the behavioural variables."
+    "L2 — Previous_GPA vs dependent variable": (
+        "Primary OLS uses **`CGPA400`** (Level 400 GPA). `Previous_GPA = mean(CGPA100–300)` is "
+        "arithmetically prior to `CGPA400` (no shared level component). Adj R² is lower than "
+        "models on overall `CGPA`, which still overlaps Previous_GPA — see optional legacy metrics."
     ),
     "L3 — Synthesized Variables Are Not Observed Data": (
         "`Attendance_Rate`, `Study_Hours_Per_Week`, and `Course_Load` were never measured. "
@@ -145,10 +147,7 @@ model = run_ols(df)
 
 # Derived quantities used across tabs
 PREDICTORS   = DESIGN_COLUMNS
-COEF_LABELS  = [
-    "Previous_GPA", "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
-    "Genotype (AS vs AA)", "Genotype (SS vs AA)",
-]
+TARGET_COL   = DEFAULT_TARGET
 LEVEL_COLS   = ["CGPA100", "CGPA200", "CGPA300", "CGPA400"]
 LEVEL_LABELS = ["Level 100", "Level 200", "Level 300", "Level 400"]
 fitted       = model.fittedvalues
@@ -283,7 +282,8 @@ with tab1:
 with tab2:
     st.header("OLS Regression Results")
     st.markdown(
-        "**Model:** `CGPA ~ Previous_GPA + Attendance_Rate + Study_Hours_Per_Week + Course_Load`"
+        "**Model:** `CGPA400 ~ Previous_GPA + Attendance_Rate + Study_Hours_Per_Week "
+        "+ Course_Load + Genotype_AS + Genotype_SS + Genotype_SS×Attendance`"
     )
 
     # ── Summary metrics ───────────────────────────────────────────────────────
@@ -335,9 +335,9 @@ with tab2:
     ))
     fig_coef.add_vline(x=0, line_width=1, line_color="black")
     fig_coef.update_layout(
-        title="OLS Coefficients with 95% Confidence Intervals",
+        title="OLS Coefficients with 95% Confidence Intervals (DV = CGPA400)",
         xaxis_title="Coefficient value",
-        height=320,
+        height=400,
     )
     st.plotly_chart(fig_coef, width="stretch")
 
@@ -410,25 +410,23 @@ with tab2:
     st.plotly_chart(fig_diag, width="stretch")
 
     st.info(
-        "**Q-Q plot note:** Near-normal residuals here are partly an artifact of "
-        "`Previous_GPA`'s arithmetic overlap with `CGPA` (Limitation L2). "
-        "Three of the four components of `CGPA` are contained in `Previous_GPA`. "
-        "The well-behaved diagnostics reflect a largely definitional relationship, "
-        "not purely good model specification."
+        "**Q-Q plot note:** Residual shape still reflects synthesis (L1–L3) and strong "
+        "`Previous_GPA` → `CGPA400` correlation. With CGPA400 as DV, overlap with "
+        "`Previous_GPA` is reduced versus overall `CGPA` (L2)."
     )
 
     # ── Actual vs Predicted ───────────────────────────────────────────────────
-    st.subheader("Actual vs Predicted CGPA")
+    st.subheader("Actual vs Predicted CGPA400")
     scatter_df = pd.DataFrame({
         "Predicted": fitted.values,
-        "Actual":    df["CGPA"].values,
+        "Actual":    df[TARGET_COL].values,
         "Programme": df["Prog Code"].values,
     })
     fig_avp = px.scatter(
         scatter_df, x="Predicted", y="Actual",
         color="Programme", opacity=0.4,
-        title=f"Actual vs Predicted CGPA  (Adj R² = {model.rsquared_adj:.3f})",
-        labels={"Predicted": "Predicted CGPA", "Actual": "Actual CGPA"},
+        title=f"Actual vs Predicted CGPA400  (Adj R² = {model.rsquared_adj:.3f})",
+        labels={"Predicted": "Predicted CGPA400", "Actual": "Actual CGPA400"},
     )
     lo = min(scatter_df["Predicted"].min(), scatter_df["Actual"].min())
     hi = max(scatter_df["Predicted"].max(), scatter_df["Actual"].max())
@@ -441,8 +439,8 @@ with tab2:
     fig_avp.update_layout(height=500)
     st.plotly_chart(fig_avp, width="stretch")
     st.caption(
-        "The tight cluster around the identity line is driven by `Previous_GPA` "
-        "dominating the regression (L2) — not by the behavioural predictors."
+        "Fit quality is dominated by `Previous_GPA` (genuine lag vs CGPA400). "
+        "Behavioural and genotype terms are illustrative (L1, L3, L7)."
     )
 
     # ── Full statsmodels summary ──────────────────────────────────────────────
@@ -583,27 +581,27 @@ with tab4:
     k_cv = st.slider("CV folds (k)", min_value=3, max_value=10, value=5, step=1)
     seed_cv = st.number_input("Random seed (CV splits)", value=42, step=1)
 
-    m_cv = cross_val_ols_metrics(df, "CGPA", k=int(k_cv), seed=int(seed_cv))
+    m_cv = cross_val_ols_metrics(df, TARGET_COL, k=int(k_cv), seed=int(seed_cv))
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("MAE (OOF)", f"{m_cv['mae']:.4f}")
     c2.metric("RMSE (OOF)", f"{m_cv['rmse']:.4f}")
     c3.metric("R² (OOF)", f"{m_cv['r2_oof']:.4f}")
     c4.metric("Baseline MAE", f"{m_cv['baseline_mean_mae']:.4f}")
     st.caption(
-        "Baseline = always predict each fold's training-set mean CGPA for held-out rows "
+        "Baseline = always predict each fold's training-set mean CGPA400 for held-out rows "
         "(same k and seed)."
     )
 
-    if st.checkbox("Show exploratory CGPA400 metrics (OQ-1)", value=False):
+    if st.checkbox("Show legacy overall-CGPA metrics (arithmetic overlap)", value=False):
         st.warning(
-            "CGPA400 metrics are for discussion only until Kelvin and supervisor approve "
-            "a dependent-variable reframe."
+            "Overall `CGPA` shares components with `Previous_GPA` (L2). "
+            "Adj R² is inflated versus the primary CGPA400 target."
         )
-        m4 = cross_val_ols_metrics(df, "CGPA400", k=int(k_cv), seed=int(seed_cv))
+        m_legacy = cross_val_ols_metrics(df, "CGPA", k=int(k_cv), seed=int(seed_cv))
         d1, d2, d3 = st.columns(3)
-        d1.metric("CGPA400 MAE", f"{m4['mae']:.4f}")
-        d2.metric("CGPA400 RMSE", f"{m4['rmse']:.4f}")
-        d3.metric("CGPA400 R² (OOF)", f"{m4['r2_oof']:.4f}")
+        d1.metric("CGPA MAE", f"{m_legacy['mae']:.4f}")
+        d2.metric("CGPA RMSE", f"{m_legacy['rmse']:.4f}")
+        d3.metric("CGPA R² (OOF)", f"{m_legacy['r2_oof']:.4f}")
 
     st.divider()
     st.subheader("Score new rows")
@@ -655,14 +653,14 @@ with tab4:
                 "Course_Load": int(cl),
                 "Genotype": genotype,
             }])
-        if st.button("Compute predicted CGPA"):
+        if st.button("Compute predicted CGPA400"):
             Xs, msgs = prepare_scoring_features(raw_in)
             for msg in msgs:
                 st.info(msg)
             for w in soft_validate_predictors(Xs):
                 st.warning(w)
             pred = float(score_dataframe(model, Xs).iloc[0])
-            st.success(f"Predicted CGPA: **{pred:.4f}** (0–5 scale)")
+            st.success(f"Predicted CGPA400: **{pred:.4f}** (0–5 scale)")
 
     else:
         up = st.file_uploader(

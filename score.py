@@ -1,7 +1,7 @@
 """
 score.py
 ──────────────────────────────────────────────────────────────────────────────
-Operational CGPA predictions from the reference OLS fit on the full deduped
+Operational CGPA400 predictions from the reference OLS fit on the full deduped
 enriched dataset (same specification as app.py / model.ipynb).
 
 Input rows must include Attendance_Rate, Study_Hours_Per_Week, Course_Load, and
@@ -50,7 +50,7 @@ def main() -> int:
     print_limitation_banner()
 
     train = load_enriched_deduped(args.training)
-    model = fit_reference_ols(train, target="CGPA")
+    model = fit_reference_ols(train)
 
     if args.input:
         raw = pd.read_csv(args.input)
@@ -85,7 +85,7 @@ def main() -> int:
     pred = score_dataframe(model, X)
     out = pd.concat([raw.reset_index(drop=True), pred.reset_index(drop=True)], axis=1)
     out.to_csv(args.output, index=False)
-    print(f"Wrote {len(out)} row(s) with column 'predicted_CGPA' → {args.output}")
+    print(f"Wrote {len(out)} row(s) with column 'predicted_CGPA400' → {args.output}")
     print(
         "Reminder: predicted values depend on synthesized predictors for training rows "
         "(L1, L3) and are not registrar-official forecasts."

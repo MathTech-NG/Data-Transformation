@@ -6,11 +6,11 @@ It is the first thing an agent should read after AGENTS.md.
 
 ---
 
-## Current State (as of Session 3)
+## Current State (as of Senior Review implementation)
 
-**Pipeline status:** STABLE — all 43 verify.py checks pass  
-**Active branch of work:** Prediction layer shipped (`predict.py`, `score.py`, `prediction_common.py`, Streamlit tab **Predict & CV**).  
-**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 15 columns (includes `Genotype`)  
+**Pipeline status:** STABLE — all 47 verify.py checks pass  
+**Active branch of work:** Senior-review fixes (CGPA400 DV, genotype→attendance pathway, SS×Attendance interaction, formal time series in notebook).  
+**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 17 columns (includes `Genotype`, `Trajectory_Slope`, `Trajectory_Class`)  
 
 ### Dataset summary
 
@@ -24,31 +24,29 @@ It is the first thing an agent should read after AGENTS.md.
 | CGPA100–400 | float | Original | per-level GPA, all in [0, 5] |
 | SGPA | float | Original | semester GPA |
 
-### OLS snapshot (CGPA ~ all 4 predictors)
+### OLS snapshot (CGPA400 ~ 7 predictors; primary model)
 
-| Predictor | r | p-value | VIF |
+| Predictor | r(CGPA400) | p-value (OLS) | VIF (main effects) |
 |---|---|---|---|
-| Previous_GPA | 0.976 | < 0.001 | 1.13 |
-| Attendance_Rate | 0.280 | < 0.001 | 1.08 |
-| Study_Hours_Per_Week | 0.238 | < 0.001 | 1.06 |
-| Course_Load | -0.032 | 0.016 | 1.00 |
-| **Adj R²** | | **0.953** | |
+| Previous_GPA | ~0.80 | < 0.001 | 1.13 |
+| Attendance_Rate | ~0.28 | < 0.001 | 1.10 |
+| Study_Hours_Per_Week | ~0.24 | varies | 1.07 |
+| Course_Load | ~-0.03 | varies | 1.00 |
+| Genotype_SS × Attendance | — | may be NS | inflated (expected) |
+| **Adj R²** | | **~0.65** | |
 
-Note: The high adj R² is driven by Previous_GPA (arithmetic overlap), not
-the behavioural variables. This is Limitation L2 — see README.md §9.
+Note: Overall CGPA models still show r(Previous_GPA, CGPA) ≈ 0.976 (legacy overlap).
+Primary DV is CGPA400 — see memory.md §3 and engineer_brief.md.
 
 ---
 
 ## Open Questions (must not be resolved autonomously)
 
 ### OQ-1 — Reframe dependent variable as CGPA400?
-**Status:** Open  
-**Why it matters:** If the DV is CGPA400 and Previous_GPA = mean(CGPA100,200,300),
-there is zero arithmetic overlap between predictor and target. The regression
-would be scientifically cleaner. Adj R² would likely drop to ~0.65–0.70,
-which is more honest about what the behavioural variables actually explain.  
-**Blocking:** Requires Kelvin and supervisor to agree on research question reframe.  
-**Agent instruction:** Do not implement. Surface this in any methodology discussion.
+**Status:** Resolved (senior review, May 2026)  
+**Decision:** Primary DV is **CGPA400** across `prediction_common.py`, `predict.py`, `score.py`, `app.py`, `verify.py`, and `model.ipynb`. Overall CGPA metrics remain optional for comparison.  
+**Observed Adj R²:** ~0.65 (honest range vs ~0.95 on CGPA). OOF MAE ≈ 0.38, R² ≈ 0.64.  
+**Agent instruction:** Do not revert to CGPA as default DV without explicit human instruction.
 
 ### OQ-2 — Pooled model vs. per-programme-tier models?
 **Status:** Open  

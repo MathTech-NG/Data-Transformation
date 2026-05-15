@@ -63,10 +63,11 @@ to the Level 400 outcome period.
 components with the final CGPA. r(Previous_GPA, CGPA) = 0.976. The adj R²
 of 0.954 is dominated by this variable, not the behavioural predictors.
 
-**Cleanest unimplemented fix:** Reframe dependent variable as CGPA400.
-Under this framing, Previous_GPA has zero arithmetic overlap.
-**Status:** Open — awaiting human decision (see context.md).  
-**Resolved by:** Third-party review, session 2. Implemented in session 2.
+**Cleanest fix (implemented, senior review May 2026):** Reframe dependent variable as CGPA400.
+Under this framing, Previous_GPA has zero arithmetic overlap with the DV.
+**Status:** Implemented — default in `prediction_common.py`, `predict.py`, `score.py`, `app.py`, `verify.py`, `model.ipynb`.  
+**Observed Adj R²:** ~0.65 (vs ~0.95 on overall CGPA).  
+**Resolved by:** Senior review (`engineer_brief.md`), May 2026.
 
 ---
 
@@ -110,7 +111,7 @@ CIS/MIS/CEN/ICE are extrapolated from programme-tier ranking logic.
 
 ## §5. Verify.py Check Suite
 
-**Current check count:** 43 (34 original + 4 genotype frequency/category + 1 genotype correlation + 4 VIF on extended design)  
+**Current check count:** 47 (includes trajectory schema, SS attendance < AA, CGPA400 correlations/regression, VIF split for SS interaction block)  
 **Exit code 0:** all checks passed  
 **Exit code 1:** one or more failed  
 
@@ -118,12 +119,13 @@ Checks cover:
 1. Schema & Integrity (3 checks)
 2. Value Ranges (11 checks)
 2b. Genotype (4 checks)
+2c. Trajectory (2 checks)
 3. Distributional Plausibility (7 checks)
-4. Correlation Structure (5 checks)
-5. Regression Readiness (13 checks — adj R², significance, VIF on six-predictor design)
+4. Correlation Structure (6 checks)
+5. Regression Readiness (14 checks — CGPA400 adj R², significance, VIF main effects + SS block)
 
-**Rule:** Checks may only be added, never removed or weakened.  
-**Last confirmed pass:** Genotype integration session, all 43 checks pass.
+**Rule:** Checks may only be added, never removed or weakened. VIF on SS×Attendance uses an expected-inflation pass, not a <10 threshold.  
+**Last confirmed pass:** Senior review implementation, all 47 checks pass.
 
 ---
 

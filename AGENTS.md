@@ -110,7 +110,7 @@ These constraints are non-negotiable and must survive across all sessions:
 - "GPA" in this project always means the 5.0-scale CGPA used at Mountain Top University
 - "Course Load" always means **number of courses per semester**, not credit units
 - "Previous GPA" always means the lagged three-year cumulative average, not CGPA100
-- The dependent variable is `CGPA` (overall cumulative) unless explicitly reframed to `CGPA400`
+- The dependent variable is `CGPA400` (Level 400 GPA) for primary OLS/CV/scoring; overall `CGPA` is legacy comparison only
 - Programme codes in the dataset (CIS, MAT, etc.) are the institution's actual codes,
   not the CS/Maths department labels (CSC, SWE, CYB, MATH) used in the paper's framing
 
@@ -120,7 +120,7 @@ These constraints are non-negotiable and must survive across all sessions:
 
 These must not be resolved autonomously by an agent — flag them and wait:
 
-- Whether to reframe the dependent variable as CGPA400 (eliminates arithmetic overlap in Previous_GPA)
+- ~~Whether to reframe the dependent variable as CGPA400~~ — **resolved** (see context.md OQ-1)
 - Whether to run separate models per programme tier or a single pooled model
 - Whether the 5% overload rate for Course_Load should be verified against MTU registrar data
 - Whether to include SGPA as an additional predictor or leave it out

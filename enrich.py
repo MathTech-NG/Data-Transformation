@@ -112,6 +112,14 @@ OVERLOAD_HI   = 20      # inclusive — max approved overload
 GENOTYPE_LABELS = ("AA", "AS", "SS")
 GENOTYPE_PROBS  = (0.75, 0.24, 0.01)
 
+# Health-pathway attendance shifts (applied after blend; genotype must be drawn first)
+GENOTYPE_ATT_SHIFT: dict[str, float] = {"AA": 0.0, "AS": -2.5, "SS": -8.0}
+GENOTYPE_ATT_NOISE_EXTRA: dict[str, float] = {"AA": 0.0, "AS": 0.5, "SS": 3.0}
+
+# Per-student level-GPA trajectory (observed CGPA100–400)
+LEVEL_COLS = ["CGPA100", "CGPA200", "CGPA300", "CGPA400"]
+TRAJECTORY_THRESHOLD = 0.05
+
 
 # ─── SYNTHESIS FUNCTIONS ──────────────────────────────────────────────────────
 
@@ -119,21 +127,26 @@ def synthesize_genotype(n: int, rng: np.random.Generator) -> np.ndarray:
     """Independent multinomial draw for Genotype (AA, AS, SS)."""
     return rng.choice(GENOTYPE_LABELS, size=n, p=GENOTYPE_PROBS)
 
-def synthesize_attendance(cgpa: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+def synthesize_attendance(
+    cgpa: np.ndarray,
+    genotype: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
     """
-    Blended generative model for Attendance_Rate (%).
+    Blended generative model for Attendance_Rate (%), with genotype-conditional shift.
 
         X = BLEND_ALPHA * base  +  (1 - BLEND_ALPHA) * correlated  +  noise
-
-    base       ~ N(ATT_BASE_MU, ATT_BASE_SIGMA²)   [CGPA-independent]
-    correlated = ATT_CORR_BASE + ATT_CORR_BETA * CGPA
-    noise      ~ N(0, ATT_BLEND_NOISE²)
+        + genotype shift + extra genotype noise
     """
-    n           = len(cgpa)
-    base        = rng.normal(ATT_BASE_MU, ATT_BASE_SIGMA, n)
-    correlated  = ATT_CORR_BASE + ATT_CORR_BETA * cgpa
-    noise       = rng.normal(0, ATT_BLEND_NOISE, n)
-    blended     = BLEND_ALPHA * base + (1 - BLEND_ALPHA) * correlated + noise
+    n = len(cgpa)
+    base = rng.normal(ATT_BASE_MU, ATT_BASE_SIGMA, n)
+    correlated = ATT_CORR_BASE + ATT_CORR_BETA * cgpa
+    noise = rng.normal(0, ATT_BLEND_NOISE, n)
+    blended = BLEND_ALPHA * base + (1 - BLEND_ALPHA) * correlated + noise
+
+    shift = np.array([GENOTYPE_ATT_SHIFT.get(str(g), 0.0) for g in genotype])
+    extra_std = np.array([GENOTYPE_ATT_NOISE_EXTRA.get(str(g), 0.0) for g in genotype])
+    blended = blended + shift + rng.normal(0, 1, n) * extra_std
     return np.clip(np.round(blended, 1), ATT_LO, ATT_HI)
 
 
@@ -190,23 +203,43 @@ def derive_previous_gpa(df: pd.DataFrame) -> pd.Series:
     return ((df["CGPA100"] + df["CGPA200"] + df["CGPA300"]) / 3).round(4)
 
 
+def compute_trajectory_slope(row: pd.Series) -> float:
+    """OLS slope of level GPAs vs t = 1..4."""
+    t = np.array([1.0, 2.0, 3.0, 4.0])
+    y = row[LEVEL_COLS].values.astype(float)
+    t_mean = t.mean()
+    y_mean = y.mean()
+    denom = np.sum((t - t_mean) ** 2)
+    if denom == 0:
+        return 0.0
+    return float(np.sum((t - t_mean) * (y - y_mean)) / denom)
+
+
+def classify_trajectory(slope: float) -> str:
+    if slope > TRAJECTORY_THRESHOLD:
+        return "Improving"
+    if slope < -TRAJECTORY_THRESHOLD:
+        return "Declining"
+    return "Stable"
+
+
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def enrich(input_path: str, output_path: str, seed: int) -> pd.DataFrame:
     df  = pd.read_csv(input_path)
     rng = np.random.default_rng(seed)
 
-    # Fix 2: lagged cumulative GPA
     df["Previous_GPA"] = derive_previous_gpa(df)
 
-    # Fix 1: blended synthesis
-    df["Attendance_Rate"]      = synthesize_attendance(df["CGPA"].values, rng)
+    df["Genotype"] = synthesize_genotype(len(df), rng)
+    df["Attendance_Rate"] = synthesize_attendance(
+        df["CGPA"].values, df["Genotype"].values, rng
+    )
     df["Study_Hours_Per_Week"] = synthesize_study_hours(df["CGPA"].values, rng)
-
-    # Unchanged: programme-stratified course load
     df["Course_Load"] = synthesize_course_load(df["Prog Code"], rng)
 
-    df["Genotype"] = synthesize_genotype(len(df), rng)
+    df["Trajectory_Slope"] = df.apply(compute_trajectory_slope, axis=1).round(4)
+    df["Trajectory_Class"] = df["Trajectory_Slope"].apply(classify_trajectory)
 
     cols = [
         "ID No", "Prog Code", "Gender", "YoG",
@@ -214,6 +247,7 @@ def enrich(input_path: str, output_path: str, seed: int) -> pd.DataFrame:
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
         "Genotype",
+        "Trajectory_Slope", "Trajectory_Class",
     ]
     df = df[cols]
 

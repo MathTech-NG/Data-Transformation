@@ -16,6 +16,8 @@ import statsmodels.api as sm
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
+DEFAULT_TARGET = "CGPA400"
+
 CONTINUOUS_PREDICTORS = [
     "Previous_GPA",
     "Attendance_Rate",
@@ -23,12 +25,21 @@ CONTINUOUS_PREDICTORS = [
     "Course_Load",
 ]
 GENOTYPE_DUMMY_COLS = ["Genotype_AS", "Genotype_SS"]
-DESIGN_COLUMNS = CONTINUOUS_PREDICTORS + GENOTYPE_DUMMY_COLS
+INTERACTION_COLS = ["Genotype_SS_x_Attendance"]
+DESIGN_COLUMNS = CONTINUOUS_PREDICTORS + GENOTYPE_DUMMY_COLS + INTERACTION_COLS
+COEF_LABELS = [
+    "Previous_GPA",
+    "Attendance_Rate",
+    "Study_Hours_Per_Week",
+    "Course_Load",
+    "Genotype (AS vs AA)",
+    "Genotype (SS vs AA)",
+    "SS x Attendance",
+]
 LEVEL_FOR_PREVIOUS = ["CGPA100", "CGPA200", "CGPA300"]
 BEHAVIOURAL = ["Attendance_Rate", "Study_Hours_Per_Week", "Course_Load"]
 VALID_GENOTYPES = frozenset({"AA", "AS", "SS"})
 
-# Backward-compatible alias (continuous only — use DESIGN_COLUMNS for OLS)
 PREDICTORS = CONTINUOUS_PREDICTORS
 
 
@@ -46,8 +57,8 @@ def derive_previous_gpa(df: pd.DataFrame) -> pd.Series:
 
 def build_design_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """
-    OLS design matrix: four continuous predictors + Genotype dummies (AA reference).
-    Requires column Genotype with values AA, AS, or SS.
+    OLS design matrix: continuous predictors + genotype dummies (AA reference)
+    + Genotype_SS x Attendance_Rate interaction.
     """
     if "Genotype" not in df.columns:
         raise KeyError("Column 'Genotype' is required (AA, AS, or SS).")
@@ -64,10 +75,18 @@ def build_design_matrix(df: pd.DataFrame) -> pd.DataFrame:
         },
         index=df.index,
     )
-    return pd.concat([cont, dums], axis=1)
+    interaction = pd.DataFrame(
+        {
+            "Genotype_SS_x_Attendance": (
+                dums["Genotype_SS"] * df["Attendance_Rate"].astype(float)
+            ),
+        },
+        index=df.index,
+    )
+    return pd.concat([cont, dums, interaction], axis=1)
 
 
-def fit_reference_ols(df: pd.DataFrame, target: str = "CGPA"):
+def fit_reference_ols(df: pd.DataFrame, target: str = DEFAULT_TARGET):
     """Full-sample OLS used for operational scoring (matches app.py)."""
     X = sm.add_constant(build_design_matrix(df))
     y = df[target]
@@ -80,10 +99,7 @@ def cross_val_ols_metrics(
     k: int,
     seed: int,
 ) -> dict[str, Any]:
-    """
-    K-fold CV with the same OLS specification (continuous + genotype dummies).
-    Returns stacked out-of-fold predictions for MAE / RMSE / R² and baseline metrics.
-    """
+    """K-fold CV with the full OLS design matrix."""
     if target_col not in df.columns:
         raise KeyError(f"Missing target column: {target_col}")
     n = len(df)
@@ -124,17 +140,14 @@ def cross_val_ols_metrics(
 
 
 def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    """
-    Build rows with continuous predictors + Genotype for build_design_matrix.
-
-    Either supply Previous_GPA + behavioural + Genotype, or CGPA100–300 + behavioural + Genotype.
-    """
+    """Build rows with continuous predictors + Genotype for build_design_matrix."""
     msgs: list[str] = []
     used = (
         set(CONTINUOUS_PREDICTORS)
         | set(LEVEL_FOR_PREVIOUS)
         | {"Genotype"}
         | set(GENOTYPE_DUMMY_COLS)
+        | set(INTERACTION_COLS)
     )
     extras = [c for c in raw.columns if c not in used]
     if extras:
@@ -143,9 +156,7 @@ def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
         )
 
     if "Genotype" not in raw.columns:
-        raise ValueError(
-            "Missing required column 'Genotype'. Use AA, AS, or SS."
-        )
+        raise ValueError("Missing required column 'Genotype'. Use AA, AS, or SS.")
 
     has_prev = "Previous_GPA" in raw.columns
     has_levels = all(c in raw.columns for c in LEVEL_FOR_PREVIOUS)
@@ -197,14 +208,15 @@ def soft_validate_predictors(df: pd.DataFrame) -> list[str]:
 
 
 def score_dataframe(model: Any, feature_rows: pd.DataFrame) -> pd.Series:
-    """Vector of predicted CGPA (same target the reference model was fit on)."""
+    """Vector of predicted CGPA400."""
     X_const = sm.add_constant(build_design_matrix(feature_rows), has_constant="add")
-    return pd.Series(model.predict(X_const), name="predicted_CGPA")
+    return pd.Series(model.predict(X_const), name="predicted_CGPA400")
 
 
 def print_limitation_banner() -> None:
     print(
-        "\nNote (L1–L3, L7): Attendance, study hours, and genotype are synthesized; "
-        "Previous_GPA overlaps arithmetically with final CGPA. "
+        "\nNote (L1, L3, L7): Attendance and study hours are partly synthesized; "
+        "genotype affects attendance via an assumed health pathway. "
+        "Previous_GPA is arithmetically prior to CGPA400 (no overlap). "
         "Metrics and scores are illustrative — not empirical proof of causation.\n"
     )

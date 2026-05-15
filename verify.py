@@ -50,7 +50,7 @@ def check_schema(df: pd.DataFrame) -> list[bool]:
         "CGPA", "Previous_GPA",
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
-        "Genotype",
+        "Genotype", "Trajectory_Slope", "Trajectory_Class",
     }
     missing = required - set(df.columns)
     results.append(check(
@@ -151,6 +151,30 @@ def check_genotype(df: pd.DataFrame) -> list[bool]:
         0.003 <= p_ss <= 0.05,
         f"Observed SS = {p_ss:.3f}",
     ))
+    aa_att = df.loc[df["Genotype"] == "AA", "Attendance_Rate"].mean()
+    ss_att = df.loc[df["Genotype"] == "SS", "Attendance_Rate"].mean()
+    results.append(check(
+        "SS mean Attendance_Rate < AA mean (health-pathway synthesis)",
+        ss_att < aa_att,
+        f"AA mean = {aa_att:.2f}%, SS mean = {ss_att:.2f}%",
+    ))
+    return results
+
+
+def check_trajectory(df: pd.DataFrame) -> list[bool]:
+    results = []
+    valid_classes = {"Improving", "Stable", "Declining"}
+    observed = set(df["Trajectory_Class"].astype(str).unique())
+    results.append(check(
+        "Trajectory_Class in {Improving, Stable, Declining}",
+        observed <= valid_classes,
+        f"Unexpected: {observed - valid_classes}" if not observed <= valid_classes else "",
+    ))
+    results.append(check(
+        "Trajectory_Slope in plausible range [-1.0, 1.0]",
+        df["Trajectory_Slope"].between(-1.0, 1.0).all(),
+        f"min={df['Trajectory_Slope'].min():.3f}, max={df['Trajectory_Slope'].max():.3f}",
+    ))
     return results
 
 
@@ -206,47 +230,43 @@ def check_distributions(df: pd.DataFrame, alpha: float) -> list[bool]:
 
 
 def check_correlations(df: pd.DataFrame) -> list[bool]:
-    """
-    Verify that synthesized variables have the expected directional
-    correlations with CGPA, within credible bounds.
-    """
+    """Correlations with primary modelling target CGPA400."""
     results = []
+    y = df["CGPA400"]
 
-    r_att = df["CGPA"].corr(df["Attendance_Rate"])
+    r_att = y.corr(df["Attendance_Rate"])
     results.append(check(
-        "Attendance_Rate weakly-to-moderately correlated with CGPA (0.15 < r < 0.45)",
-        0.15 < r_att < 0.45,
-        f"Pearson r = {r_att:.3f}  (blended synthesis target: ~0.25–0.30)",
+        "Attendance_Rate correlated with CGPA400 (0.10 < r < 0.50)",
+        0.10 < r_att < 0.50,
+        f"Pearson r = {r_att:.3f}",
     ))
 
-    r_sh = df["CGPA"].corr(df["Study_Hours_Per_Week"])
+    r_sh = y.corr(df["Study_Hours_Per_Week"])
     results.append(check(
-        "Study_Hours_Per_Week weakly-to-moderately correlated with CGPA (0.15 < r < 0.45)",
-        0.15 < r_sh < 0.45,
-        f"Pearson r = {r_sh:.3f}  (blended synthesis target: ~0.25–0.30)",
+        "Study_Hours_Per_Week correlated with CGPA400 (0.10 < r < 0.50)",
+        0.10 < r_sh < 0.50,
+        f"Pearson r = {r_sh:.3f}",
     ))
 
-    r_cl = df["CGPA"].corr(df["Course_Load"])
+    r_cl = y.corr(df["Course_Load"])
     results.append(check(
-        "Course_Load near-zero correlated with CGPA (|r| < 0.15)",
+        "Course_Load near-zero correlated with CGPA400 (|r| < 0.15)",
         abs(r_cl) < 0.15,
-        f"Pearson r = {r_cl:.3f}  (load is structurally determined, not GPA-driven)",
+        f"Pearson r = {r_cl:.3f}",
     ))
 
-    r_prev = df["CGPA"].corr(df["Previous_GPA"])
+    r_prev = y.corr(df["Previous_GPA"])
     results.append(check(
-        "Previous_GPA strongly correlated with CGPA (r > 0.80)",
-        r_prev > 0.80,
-        f"Pearson r = {r_prev:.3f}  (lagged 3-year cumulative GPA)",
+        "Previous_GPA correlated with CGPA400 (r > 0.60)",
+        r_prev > 0.60,
+        f"Pearson r = {r_prev:.3f}  (lagged 3-year mean vs final-year GPA)",
     ))
 
-    # Genotype synthesized independently of CGPA — |r| should be small
-    gt_num = df["Genotype"].map({"AA": 0, "AS": 1, "SS": 2}).astype(float)
-    r_gt = df["CGPA"].corr(gt_num)
+    r_att_cgpa = df["CGPA"].corr(df["Attendance_Rate"])
     results.append(check(
-        "Genotype ordinal proxy weakly correlated with CGPA (|r| < 0.15)",
-        abs(r_gt) < 0.15,
-        f"Pearson r = {r_gt:.3f}  (independent synthesis)",
+        "Attendance_Rate still weakly correlated with CGPA (blend anchor, 0.15 < r < 0.45)",
+        0.15 < r_att_cgpa < 0.45,
+        f"Pearson r = {r_att_cgpa:.3f}",
     ))
 
     return results
@@ -254,14 +274,11 @@ def check_correlations(df: pd.DataFrame) -> list[bool]:
 
 def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
     """
-    Lightweight OLS regression check:
-        CGPA ~ Previous_GPA + Attendance + Study_Hours + Course_Load + Genotype dummies
+    Lightweight OLS regression check (primary target CGPA400):
+        CGPA400 ~ Previous_GPA + behavioural + genotype dummies + SS x Attendance
 
-    Verifies that:
-      - Previous_GPA, Attendance_Rate, Study_Hours_Per_Week are significant (p < alpha)
-      - Course_Load is non-significant (it is a structural variable, not a GPA predictor)
-      - Adjusted R² > 0.60
-      - VIF < 10 for all predictors (no severe multicollinearity)
+    Verifies Previous_GPA significance, 0.50 < Adj R² < 0.95, VIF < 10 on main effects.
+    Genotype_SS and Genotype_SS_x_Attendance may inflate VIF (expected with interaction).
     """
     try:
         from sklearn.preprocessing import StandardScaler
@@ -275,7 +292,7 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
 
     predictors = DESIGN_COLUMNS
     X = build_design_matrix(df).values
-    y = df["CGPA"].values
+    y = df["CGPA400"].values
     n, k = X.shape
 
     # OLS via numpy for p-values (no statsmodels dependency required)
@@ -295,9 +312,9 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
     r2_adj = 1 - (1 - r2) * (n - 1) / (n - k - 1)
 
     results.append(check(
-        f"Adjusted R² > 0.60  (observed: {r2_adj:.3f})",
-        r2_adj > 0.60,
-        "Lower R² expected vs v1 — blended synthesis deliberately weakens endogeneity",
+        f"Adjusted R² for CGPA400 in (0.50, 0.95)  (observed: {r2_adj:.3f})",
+        0.50 < r2_adj < 0.95,
+        "Honest range without CGPA arithmetic overlap",
     ))
 
     significant = ["Previous_GPA"]
@@ -316,28 +333,54 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
                 beta[i + 1] > 0,
                 f"p = {p:.4f},  β = {beta[i+1]:.4f}  (weak correlation by design — significance not guaranteed)",
             ))
+        elif var in ("Course_Load", "Genotype_AS", "Genotype_SS", "Genotype_SS_x_Attendance"):
+            results.append(check(
+                f"{var} reported in OLS (p may be > {alpha})",
+                True,
+                f"p = {p:.4f},  β = {beta[i+1]:.4f}",
+            ))
         else:
             results.append(check(
-                f"{var} non-significant in OLS (structural variable, p may be > {alpha})",
+                f"{var} in OLS design",
                 True,
                 f"p = {p:.4f}",
             ))
 
-    # VIF — variance inflation factor via OLS R² of each predictor on the rest
+    # VIF — main effects only; SS dummy + interaction are collinear by construction
+    vif_main = [
+        "Previous_GPA",
+        "Attendance_Rate",
+        "Study_Hours_Per_Week",
+        "Course_Load",
+        "Genotype_AS",
+    ]
+    vif_ss_block = ["Genotype_SS", "Genotype_SS_x_Attendance"]
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
+    vif_by_var: dict[str, float] = {}
     for i, var in enumerate(predictors):
         y_i = Xs[:, i]
         X_i = np.delete(Xs, i, axis=1)
         X_i_aug = np.column_stack([np.ones(n), X_i])
         b_i, _, _, _ = np.linalg.lstsq(X_i_aug, y_i, rcond=None)
         r2_i = 1 - np.sum((y_i - X_i_aug @ b_i) ** 2) / np.sum((y_i - y_i.mean()) ** 2)
-        vif = 1 / (1 - r2_i) if r2_i < 1 else float("inf")
+        vif_by_var[var] = 1 / (1 - r2_i) if r2_i < 1 else float("inf")
+
+    for var in vif_main:
+        vif = vif_by_var[var]
         results.append(check(
             f"VIF({var}) < 10  (no severe multicollinearity)",
             vif < 10,
             f"VIF = {vif:.2f}",
         ))
+
+    ss_vif = vif_by_var["Genotype_SS"]
+    int_vif = vif_by_var["Genotype_SS_x_Attendance"]
+    results.append(check(
+        "Genotype_SS + SS×Attendance: VIF inflation expected (interaction block)",
+        ss_vif > 10 and int_vif > 10,
+        f"VIF(Genotype_SS) = {ss_vif:.2f}, VIF(SS×Attendance) = {int_vif:.2f}",
+    ))
 
     return results
 
@@ -354,6 +397,7 @@ def run_all_checks(input_path: str, alpha: float) -> int:
         ("1. Schema & Integrity",         check_schema(df)),
         ("2. Value Ranges",                check_ranges(df)),
         ("2b. Genotype",                   check_genotype(df)),
+        ("2c. Trajectory",                 check_trajectory(df)),
         ("3. Distributional Plausibility", check_distributions(df, alpha)),
         ("4. Correlation Structure",       check_correlations(df)),
         ("5. Regression Readiness",        check_regression_readiness(df, alpha)),
