@@ -9,12 +9,16 @@
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{ragged2e}
 
 \geometry{margin=1in}
 \onehalfspacing
 \setcounter{tocdepth}{2}
 \hypersetup{hidelinks}
+
 \begin{document}
+\justifying
 	\begin{center}
 		{\huge{\textbf{ Mathematical Modelling and Statistical Analysis for Predicting Students’ Academic Performance Using Multivariate Factors }}}
 	\end{center}
@@ -117,14 +121,12 @@
 		{\Large{\bf Abstract}}
 	\end{center}
 	
-	\noindent This study focuses on the development of a predictive model for analyzing students’ academic performance using Mathematical Modelling and Statistical Analysis techniques. The study examines the relationship between students’ GPA and selected factors such as study hours, attendance rate, number of courses taken, and genotype.
+	\noindent This study develops and evaluates a predictive model for students' academic performance at Mountain Top University using mathematical modelling, ordinary least squares (OLS) regression, and time series analysis on per-level GPA. The primary outcome is Level~400 GPA (CGPA400), predicted from lagged three-year performance (\textit{Previous\_GPA}), synthesized attendance and study hours, course load, haemoglobin genotype, and a health-pathway interaction for SS students. Registrar data for 3,046 graduates (2010--2014) are enriched with documented synthesis where behavioural and genotype fields were absent from the historical export.
 	
-	A multiple linear regression model is developed using both real-life and simulated datasets collected across multiple semesters. Data preprocessing and regression analysis are implemented using Python computational tools. The model is evaluated and validated using statistical performance metrics and independent real-life data.
-	
-	The findings show that the selected variables significantly influence students’ academic performance and demonstrate the effectiveness of regression analysis in predicting academic outcomes. The study provides a data-driven framework that can support academic monitoring and educational decision-making.
+	A reproducible Python pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{predict.py}) prepares the dataset, runs 47 integrity checks, and reports five-fold cross-validated error on CGPA400 (MAE $= 0.378$, adjusted in-sample $R^2 \approx 0.65$). Time series components include per-student trajectory slopes, an AR(1) panel on level-to-level GPA transitions ($\hat{\phi}_1 = 0.773$), and a Kendall trend test on cohort mean GPA across Levels 100--400. Results are illustrative under stated synthesis assumptions (L1--L7) and are not presented as causal proof from observed attendance or clinical genotype records.
 	
 	\vspace{1em}
-	\noindent \textbf{Keywords:} Academic Performance, Grade Point Average (GPA), Regression Analysis, Predictive Modelling, Mathematical Modelling, Statistical Analysis, Multivariate Factors, Study Hours, Attendance Rate, Genotype, Educational Data Analysis, and Student Performance Prediction.
+	\noindent \textbf{Keywords:} Academic performance, CGPA400, time series analysis, OLS regression, predictive modelling, attendance, study hours, genotype, trajectory classification, AR(1), Mountain Top University, educational data analysis.
 
 	\newpage
 	\tableofcontents
