@@ -520,6 +520,7 @@
 			\hline
 			CGPA & 3.495 & 0.690 & 1.520 & 3.560 & 4.990 \\
 			Previous\_GPA & 3.459 & 0.691 & 1.363 & 3.497 & 4.993 \\
+			Trajectory\_Slope\_Prior & $-0.038$ & 0.266 & $-1.350$ & $-0.020$ & 0.965 \\
 			Attendance\_Rate (\%) & 71.02 & 8.26 & 40.0 & 71.3 & 96.9 \\
 			Study\_Hours\_Per\_Week & 7.35 & 2.18 & 2.0 & 7.3 & 15.1 \\
 			Course\_Load & 11.85 & 2.09 & 8 & 12 & 20 \\
@@ -528,7 +529,7 @@
 	\end{table}
 	
 	\section{Correlation Structure}
-	Pearson correlations with CGPA400 were: \textit{Previous\_GPA} $r = 0.803$; \textit{Attendance\_Rate} $r = 0.237$; \textit{Study\_Hours\_Per\_Week} $r \approx 0.24$; \textit{Course\_Load} $r \approx -0.03$. The association for \textit{Previous\_GPA} is strong but no longer definitional (unlike $r = 0.976$ with overall CGPA). Legacy correlation with overall CGPA remains documented for comparison (Limitation L2).
+	Pearson correlations with CGPA400 were: \textit{Previous\_GPA} $r = 0.803$; \textit{Trajectory\_Slope\_Prior} $r = 0.784$ (the second-strongest bivariate association after \textit{Previous\_GPA}, consistent with momentum in prior levels predicting Level~400 performance); \textit{Attendance\_Rate} $r = 0.237$; \textit{Study\_Hours\_Per\_Week} $r \approx 0.24$; \textit{Course\_Load} $r \approx -0.03$. The association for \textit{Previous\_GPA} is strong but no longer definitional (unlike $r = 0.976$ with overall CGPA). Legacy correlation with overall CGPA remains documented for comparison (Limitation L2). In the predictor set, $r(\text{Previous\_GPA}, \text{Trajectory\_Slope\_Prior}) \approx 0.295$ --- moderate but not prohibitive; main-effect VIF values remain below 1.25.
 	
 	Figure~\ref{fig:correlation-heatmap} displays the full Pearson matrix used in exploratory analysis. GPA-related columns cluster (including $r(\text{Previous\_GPA}, \text{CGPA}) \approx 0.98$, reflecting arithmetic overlap when overall CGPA is included---L2). Behavioural predictors show weak positive links with GPA fields; \textit{Course\_Load} is near zero with all variables. The heatmap is descriptive; the estimation sample uses CGPA400 as the dependent variable, which reduces overlap with \textit{Previous\_GPA} relative to a CGPA-on-\textit{Previous\_GPA} specification.
 	
@@ -573,14 +574,14 @@
 			Genotype (SS vs AA) & 0.186 & 0.726 & $\approx 50$* \\
 			SS $\times$ Attendance & $-0.004$ & 0.615 & $\approx 50$* \\
 			\hline
-			\multicolumn{4}{l}{\footnotesize *Inflated VIF expected for SS block with interaction; main-effect VIF $< 10$.}
+			\multicolumn{4}{l}{\footnotesize *Inflated VIF expected for SS block with interaction; all main-effect VIF $< 1.25$.}
 		\end{tabular}
 	\end{table}
 	
 	\section{Model Diagnostics}
-	Residual plots (residuals versus fitted values, normal Q--Q, histogram, and scale-location) are produced in \texttt{model.ipynb} and the Streamlit OLS tab. Residuals are more dispersed than in legacy CGPA models because CGPA400 is not arithmetically nested in \textit{Previous\_GPA}. Main-effect VIF values were below 10; the SS genotype block showed expected inflation.
+	Residual plots (residuals versus fitted values, normal Q--Q, histogram, and scale-location) are produced in \texttt{model.ipynb} and the Streamlit OLS tab. Residuals are more dispersed than in legacy CGPA models because CGPA400 is not arithmetically nested in \textit{Previous\_GPA}. All main-effect VIF values were below 1.25; the SS genotype and SS$\times$attendance block showed expected inflation (VIF $\approx 50$). The overall condition number of 4{,}645 reported in the OLS summary is elevated primarily by that interaction block rather than by the main-effect predictors.
 	
-	Figure~\ref{fig:residual-diagnostics} summarizes the four standard diagnostic panels. Residuals are approximately centred on zero with no strong funnel pattern; the Q--Q plot follows the normal reference line with minor tail deviation. The dashboard note applies: residual shape still reflects synthesis (L1--L3) and the strong \textit{Previous\_GPA} $\rightarrow$ CGPA400 relationship; diagnostics support use of OLS as an illustrative linear approximation, not proof of causal mechanisms.
+	Figure~\ref{fig:residual-diagnostics} summarizes the four standard diagnostic panels. Residuals are approximately centred on zero with no strong funnel pattern; the Q--Q plot follows the normal reference line with minor tail deviation. The Durbin--Watson statistic of 1.491 indicates mild positive autocorrelation in residuals, consistent with the cross-sectional ordering of the data by programme and graduation year; this does not affect the coefficient estimates but should be noted as a limitation of the OLS specification. The dashboard note applies: residual shape still reflects synthesis (L1--L3) and the strong \textit{Previous\_GPA} $\rightarrow$ CGPA400 relationship; diagnostics support use of OLS as an illustrative linear approximation, not proof of causal mechanisms.
 	
 	\begin{figure}[htbp]
 		\centering
