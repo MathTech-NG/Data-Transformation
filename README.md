@@ -272,6 +272,7 @@ carry no clinical weight.
 
 | File | Purpose |
 |---|---|
+| [docs/PROJECT-MAIN/](docs/PROJECT-MAIN/) | **Canonical thesis** (`regression_time_series_students_performance.tex`), BibTeX, and Streamlit figure assets in `img/` (`fig-4-*`, `fig-A-*`). Build with `pdflatex` + `bibtex` from that folder; figures from `streamlit run app.py`. |
 | [VARIABLE-SYNTHESIS.md](VARIABLE-SYNTHESIS.md) | Full synthesis methodology, mathematical proofs, programme parameters, version history |
 | [Interpretation-Guide.md](Interpretation-Guide.md) | How to read every chart and table produced by the analysis |
 | [Talking-Points.md](Talking-Points.md) | Verbal presentation guide for the results |

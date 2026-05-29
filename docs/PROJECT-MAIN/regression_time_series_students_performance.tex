@@ -3,6 +3,7 @@
 % Packages
 \usepackage{amsmath}
 \usepackage{graphicx}
+\graphicspath{{img/}}
 \usepackage{setspace}
 \usepackage{geometry}
 \usepackage{natbib}
@@ -130,6 +131,7 @@
 
 	\newpage
 	\tableofcontents
+	\listoffigures
 	\newpage
 
 	\chapter{Introduction}
@@ -481,7 +483,7 @@
 	For operational forecasts, the same specification was refit on all deduplicated training rows; new input rows (CSV or JSON) supply attendance, study hours, course load, genotype, and either \textit{Previous\_GPA} or CGPA100--300 (from which \textit{Previous\_GPA} is computed). The tool writes a \texttt{predicted\_CGPA400} column. Arbitrary semester-level SGPA sequences without level CGPAs are outside the scope of this model.
 	
 	\section{Software and Reproducibility}
-	Implementation used Python~3.9+ with \texttt{pandas}, \texttt{numpy}, \texttt{scipy}, \texttt{statsmodels} (primary estimation), \texttt{scikit-learn} (cross-validation splits and error metrics), \texttt{matplotlib}, \texttt{seaborn}, \texttt{plotly}, and \texttt{streamlit}. Canonical commands: \texttt{python enrich.py}; \texttt{python verify.py}; \texttt{python predict.py}; \texttt{python score.py}; \texttt{jupyter notebook model.ipynb}; \texttt{streamlit run app.py}.
+	Implementation used Python~3.9+ with \texttt{pandas}, \texttt{numpy}, \texttt{scipy}, \texttt{statsmodels} (primary estimation), \texttt{scikit-learn} (cross-validation splits and error metrics), \texttt{matplotlib}, \texttt{seaborn}, \texttt{plotly}, and \texttt{streamlit}. The Streamlit dashboard (\texttt{streamlit run app.py}) reproduces the exploratory, regression, trajectory, and cross-validation views shown in Chapter~4 and Appendix~A. Canonical commands: \texttt{python enrich.py}; \texttt{python verify.py}; \texttt{python predict.py}; \texttt{python score.py}; \texttt{jupyter notebook model.ipynb}; \texttt{streamlit run app.py}.
 	
 	\section{Methodological Limitations}
 	\label{sec:method-limitations}
@@ -494,6 +496,15 @@
 	
 	\section{Data Presentation}
 	Table~\ref{tab:descriptive} summarizes key numeric variables. CGPA averages 3.50 (SD 0.69) on the 0--5 scale. Synthesized genotype counts were AA = 2,265 (74.4\%), AS = 742 (24.4\%), and SS = 39 (1.3\%), consistent with the multinomial priors ($P(\text{AA})=0.75$, $P(\text{AS})=0.24$, $P(\text{SS})=0.01$). The deduplicated modelling sample ($n = 2{,}974$) contains AA = 2,214, AS = 723, and SS = 37 students. Students span 17 programmes and graduation years 2010--2014.
+	
+	Figure~\ref{fig:data-overview} shows the Streamlit \emph{Data Overview} tab: the same cohort scope, descriptive statistics for observed and synthesized fields, and genotype counts after ID de-duplication. This establishes who enters the regression and time-series analyses before any modelling assumptions are applied.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-4-1-data-overview.png}
+		\caption{Data overview dashboard ($n = 2{,}974$ after de-duplication; 17 programmes; graduation years 2010--2014). Genotype counts in the modelling sample: AA 2{,}214, AS 723, SS 37. Full enriched file before de-duplication: AA 2{,}265, AS 742, SS 39.}
+		\label{fig:data-overview}
+	\end{figure}
 	
 	\begin{table}[htbp]
 		\centering
@@ -514,6 +525,16 @@
 	
 	\section{Correlation Structure}
 	Pearson correlations with CGPA400 were: \textit{Previous\_GPA} $r = 0.803$; \textit{Attendance\_Rate} $r = 0.237$; \textit{Study\_Hours\_Per\_Week} $r \approx 0.24$; \textit{Course\_Load} $r \approx -0.03$. The association for \textit{Previous\_GPA} is strong but no longer definitional (unlike $r = 0.976$ with overall CGPA). Legacy correlation with overall CGPA remains documented for comparison (Limitation L2).
+	
+	Figure~\ref{fig:correlation-heatmap} displays the full Pearson matrix used in exploratory analysis. GPA-related columns cluster (including $r(\text{Previous\_GPA}, \text{CGPA}) \approx 0.98$, reflecting arithmetic overlap when overall CGPA is included---L2). Behavioural predictors show weak positive links with GPA fields; \textit{Course\_Load} is near zero with all variables. The heatmap is descriptive; the estimation sample uses CGPA400 as the dependent variable, which reduces overlap with \textit{Previous\_GPA} relative to a CGPA-on-\textit{Previous\_GPA} specification.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.95\textwidth]{fig-4-2-correlation-heatmap.png}
+		\caption{Pearson correlation heatmap (deduplicated sample). Note $r(\text{Previous\_GPA}, \text{CGPA}) \approx 0.98$ (L2); primary OLS uses CGPA400 as the dependent variable. Synthesized predictors (L3) show weak bivariate association with GPA columns.}
+		\label{fig:correlation-heatmap}
+	\end{figure}
+	
 	Despite this marginal bivariate correlation, \textit{Study\_Hours\_Per\_Week}
 	was not significant in the full OLS model ($\hat{\beta}_3 \approx 0.001$,
 	$p = 0.875$), consistent with the dominant influence of
@@ -522,6 +543,15 @@
 	
 	\section{Regression Results}
 	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.646$. \textit{Previous\_GPA} has $\hat{\beta}_1 \approx 0.916$ ($p < 0.001$): a one-point increase in the three-year mean is associated with approximately a 0.92-point higher CGPA400, holding other predictors fixed. \textit{Attendance\_Rate} is positive and significant ($\hat{\beta}_2 \approx 0.005$, $p < 0.001$). Study hours, course load, genotype dummies, and the SS$\times$attendance interaction are not significant at $\alpha = 0.05$ in this sample, consistent with weak synthesis signal and small SS counts ($n_{\text{SS}} = 37$).
+	
+	Figure~\ref{fig:ols-results} reproduces the Streamlit OLS tab for CGPA400: coefficient estimates with $p$-values and model fit statistics. Only \textit{Previous\_GPA} and \textit{Attendance\_Rate} are significant at $\alpha = 0.05$; genotype terms are not statistically significant in this illustrative specification (L3, L7). Coefficients on synthesized behavioural variables must not be read as causal effects (L1).
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-4-3-ols-results.png}
+		\caption{OLS regression of CGPA400 ($n = 2{,}974$; adjusted $R^2 = 0.646$; $F = 776.5$). Green cells: $p < 0.05$. Genotype and study-hours terms are not significant (L3, L7). Results are illustrative under the synthesis assumptions (L1).}
+		\label{fig:ols-results}
+	\end{figure}
 	
 	\begin{table}[htbp]
 		\centering
@@ -546,17 +576,44 @@
 	\section{Model Diagnostics}
 	Residual plots (residuals versus fitted values, normal Q--Q, histogram, and scale-location) are produced in \texttt{model.ipynb} and the Streamlit OLS tab. Residuals are more dispersed than in legacy CGPA models because CGPA400 is not arithmetically nested in \textit{Previous\_GPA}. Main-effect VIF values were below 10; the SS genotype block showed expected inflation.
 	
+	Figure~\ref{fig:residual-diagnostics} summarizes the four standard diagnostic panels. Residuals are approximately centred on zero with no strong funnel pattern; the Q--Q plot follows the normal reference line with minor tail deviation. The dashboard note applies: residual shape still reflects synthesis (L1--L3) and the strong \textit{Previous\_GPA} $\rightarrow$ CGPA400 relationship; diagnostics support use of OLS as an illustrative linear approximation, not proof of causal mechanisms.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.95\textwidth]{fig-4-4-residual-diagnostics.png}
+		\caption{Residual diagnostics for the CGPA400 OLS model. Panels: residuals versus fitted, Q--Q plot, residual histogram, and scale-location. Synthesis and lagged-GPA structure affect residual shape (L1, L2).}
+		\label{fig:residual-diagnostics}
+	\end{figure}
+	
 	\section{In-Sample Fit}
 	The actual-versus-predicted CGPA400 scatter shows moderate scatter around the identity line (Adj $R^2 \approx 0.65$). This is a more honest fit than overall-CGPA models ($R^2 \approx 0.95$) and should not be cited as proof that attendance or genotype cause Level~400 outcomes (L1, L3, L7).
 	
+	Figure~\ref{fig:actual-vs-predicted} plots observed CGPA400 against in-sample fitted values, coloured by programme. Points cluster around the identity line for mid-range GPAs with greater dispersion at the lower end. Fit quality is dominated by \textit{Previous\_GPA}; programme colour indicates heterogeneity across departments, not separate programme-specific models.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-4-5-actual-vs-predicted.png}
+		\caption{Actual versus predicted CGPA400 (adjusted $R^2 \approx 0.646$). Points coloured by programme code. Illustrative in-sample fit (L1); not a causal validation of behavioural or genotype predictors.}
+		\label{fig:actual-vs-predicted}
+	\end{figure}
+	
 	\section{Out-of-Sample Predictive Performance}
-	Five-fold cross-validation (seed 42) yielded stacked out-of-fold MAE $= 0.378$, RMSE $= 0.478$, and $R^2 = 0.645$. The mean-only baseline achieved MAE $= 0.652$ and RMSE $= 0.802$. These metrics support the secondary predictive objective under the stated synthesis assumptions; they do not validate causal claims.
+	Five-fold cross-validation (seed 42) yielded stacked out-of-fold MAE $= 0.378$, RMSE $= 0.478$, and $R^2 = 0.645$. The mean-only baseline achieved MAE $= 0.652$ and RMSE $= 0.802$. These metrics support the secondary predictive objective under the stated synthesis assumptions; they do not validate causal claims. The same metrics are reported interactively in the Streamlit \emph{Predict \& CV} tab (\texttt{streamlit run app.py}); a screenshot may be added to Appendix~A when captured.
 	
 	\section{Time-Series Analysis of Per-Level GPA}
-	Using observed CGPA100--CGPA400, mean GPA trajectories were computed by programme and graduation year. Per-student \textit{Trajectory\_Slope} and \textit{Trajectory\_Class} (Improving / Stable / Declining) classify 1,168, 564, and 1,242 students respectively at a $\pm 0.05$ slope threshold. An AR(1) panel model on stacked level transitions ($\text{GPA}_t \sim \text{GPA}_{t-1}$) yielded $\hat{\phi}_1 = 0.773$ ($R^2 = 0.553$), quantifying academic momentum. Kendall's $\tau$ on the four-point cohort mean series was $\tau = 0$ ($p = 1.0$), indicating no monotonic cohort trend across levels in this cross-section. Programme heatmaps and boxplots appear in notebook Section~4 and the Streamlit Trajectory tab.
+	Using observed CGPA100--CGPA400, mean GPA trajectories were computed by programme and graduation year. Per-student \textit{Trajectory\_Slope} and \textit{Trajectory\_Class} (Improving / Stable / Declining) classify 1,168, 564, and 1,242 students respectively at a $\pm 0.05$ slope threshold. An AR(1) panel model on stacked level transitions ($\text{GPA}_t \sim \text{GPA}_{t-1}$) yielded $\hat{\phi}_1 = 0.773$ ($R^2 = 0.553$), quantifying academic momentum. Kendall's $\tau$ on the four-point cohort mean series was $\tau = 0$ ($p = 1.0$), indicating no monotonic cohort trend across levels in this cross-section.
+	
+	Figure~\ref{fig:trajectory-heatmap} shows mean GPA by programme and academic level (sorted by Level~400 performance). Each student contributes one observation per level; cell values are cohort means at each level, not repeated measurements of the same intake tracked over calendar time. Supplementary trajectory line charts and boxplots appear in Figure~\ref{fig:trajectory-composite} and Figure~\ref{fig:trajectory-by-programme} (Appendix~A).
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.95\textwidth]{fig-4-6-trajectory-heatmap.png}
+		\caption{Programme $\times$ level heatmap of mean GPA (observed CGPA100--CGPA400). Rows sorted by Level~400 mean. Cross-sectional level progression: means across students at each level, not a single cohort followed over calendar years.}
+		\label{fig:trajectory-heatmap}
+	\end{figure}
 	
 	\section{Predictive Use Case}
-	The scoring utility accepts new rows with the predictors in Table~\ref{tab:data-sources} and returns \texttt{predicted\_CGPA400}. The Streamlit \textit{Predict \& CV} tab exposes the same logic interactively.
+	The scoring utility accepts new rows with the predictors in Table~\ref{tab:data-sources} and returns \texttt{predicted\_CGPA400}. The Streamlit \emph{Predict \& CV} tab exposes the same logic interactively (see Section~\ref{sec:oof-cv-note} in Appendix~A).
 	
 	\section{Summary of Findings}
 	\begin{itemize}
@@ -592,7 +649,7 @@
 	
 	The study demonstrates the importance of choosing a dependent variable carefully. Using overall CGPA inflated $R^2$ to approximately 0.95 due to arithmetic overlap; switching to CGPA400 produced a more honest model that better represents a genuine prediction problem. Future studies in similar settings should attend to this distinction.
 	
-	By combining regression analysis with time series methods (AR(1), trajectory slopes, and the Mann-Kendall trend test on cohort means) in a single reproducible pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{model.ipynb}), the study provides a more complete characterisation of academic performance dynamics than either method alone would permit.
+	By combining regression analysis with time series methods (AR(1), trajectory slopes, and the Mann-Kendall trend test on cohort means) in a single reproducible pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{model.ipynb}, \texttt{app.py}), the study provides a more complete characterisation of academic performance dynamics than either method alone would permit. Chapter~4 figures were exported from the Streamlit dashboard after running \texttt{streamlit run app.py} on the verified enriched dataset.
 	
 	\section{Limitations of the Study}
 	\textbf{L1 --- Residual endogeneity.} Attendance and study hours were synthesized with a 40\% CGPA-linked component. Although the blended design reduces tautological regression, the significant attendance coefficient cannot be interpreted as causal evidence. Observed attendance records from the institution's registry would be required to make a causal claim.
@@ -622,6 +679,58 @@
 	
 	\section{Concluding Remarks}
 	This study set out to develop a mathematical and statistical model to analyse and predict student academic performance at Mountain Top University using integrated academic, behavioural, and health-related predictors. That aim was achieved through a reproducible pipeline combining OLS regression on CGPA400, $k$-fold cross-validation, AR(1) time series analysis on per-level GPA transitions, and per-student trajectory classification. The use of synthesized data where registrar records were incomplete is a limitation, but it was a deliberate methodological choice made transparent throughout Chapters~3--5. Quantitative modelling of this kind, when applied with appropriate caution about data provenance and dependent-variable design, can support evidence-informed educational planning and early identification of students who may benefit from institutional intervention.
+	
+	\appendix
+	\chapter{Supplementary Streamlit Figures}
+	\label{ch:appendix-figures}
+	
+	This appendix holds exploratory and supplementary views from the Streamlit dashboard (\texttt{streamlit run app.py}) that support Chapter~4 but are not required for the main narrative thread.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-A-1-cgpa-distributions.png}
+		\caption{CGPA distribution (histogram), CGPA by gender (violin plots), and synthesized variable histograms (attendance, study hours, course load).}
+		\label{fig:appendix-distributions}
+	\end{figure}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-A-2-cgpa-by-gender-programme.png}
+		\caption{CGPA distribution with mean marker, gender comparison, and programme box plots sorted by median CGPA.}
+		\label{fig:appendix-gender-programme}
+	\end{figure}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-A-3-synthesized-histograms.png}
+		\caption{Programme-level CGPA box plots and synthesized predictor distributions (L3).}
+		\label{fig:appendix-synthesized}
+	\end{figure}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.92\textwidth]{fig-A-5-ols-coefficients-ci.png}
+		\caption{OLS coefficients with 95\% confidence intervals (DV = CGPA400). Wide intervals for genotype SS reflect small $n_{\text{SS}}$ (L7).}
+		\label{fig:appendix-ols-ci}
+	\end{figure}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.95\textwidth]{fig-A-6-trajectory-by-programme.png}
+		\caption{Mean CGPA trajectory by selected programmes (Level~100--400). Each line is the mean across students at each level, not calendar-year cohort tracking.}
+		\label{fig:trajectory-by-programme}
+	\end{figure}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.95\textwidth]{fig-A-4-trajectory-composite.png}
+		\caption{Composite trajectory tab: mean lines by programme, GPA box plots by level, and programme $\times$ level heatmap.}
+		\label{fig:trajectory-composite}
+	\end{figure}
+	
+	\section{Out-of-Sample Metrics in the Dashboard}
+	\label{sec:oof-cv-note}
+	Five-fold cross-validation metrics (MAE $= 0.378$, RMSE $= 0.478$, out-of-fold $R^2 = 0.645$) are reported in text in Section~4.6 and interactively under the Streamlit \emph{Predict \& CV} tab. To include a figure, capture a screenshot after \texttt{streamlit run app.py} and add \texttt{fig-A-8-predict-cv.png} to \texttt{docs/PROJECT-MAIN/img/}.
 	
 	\newpage
 	\bibliographystyle{plainnat}
