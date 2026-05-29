@@ -54,8 +54,11 @@ Defaults
 """
 
 import argparse
+
 import numpy as np
 import pandas as pd
+
+from prediction_common import derive_trajectory_slope_prior
 
 # ─── BEHAVIOURAL VARIABLE CONSTANTS ───────────────────────────────────────────
 
@@ -240,6 +243,9 @@ def enrich(input_path: str, output_path: str, seed: int) -> pd.DataFrame:
 
     df["Trajectory_Slope"] = df.apply(compute_trajectory_slope, axis=1).round(4)
     df["Trajectory_Class"] = df["Trajectory_Slope"].apply(classify_trajectory)
+    # Prior-only slope (CGPA100–300): used in OLS / scorer — no CGPA400 leakage
+    df["Trajectory_Slope_Prior"] = derive_trajectory_slope_prior(df)
+    df["Trajectory_Class_Prior"] = df["Trajectory_Slope_Prior"].apply(classify_trajectory)
 
     cols = [
         "ID No", "Prog Code", "Gender", "YoG",
@@ -247,6 +253,7 @@ def enrich(input_path: str, output_path: str, seed: int) -> pd.DataFrame:
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
         "Genotype",
+        "Trajectory_Slope_Prior", "Trajectory_Class_Prior",
         "Trajectory_Slope", "Trajectory_Class",
     ]
     df = df[cols]

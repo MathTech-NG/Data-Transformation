@@ -32,8 +32,10 @@ from prediction_common import (
     DEFAULT_TARGET,
     DESIGN_COLUMNS,
     build_design_matrix,
+    classify_trajectory_prior,
     cross_val_ols_metrics,
     fit_reference_ols,
+    prediction_decomposition,
     prepare_scoring_features,
     score_dataframe,
     soft_validate_predictors,
@@ -282,8 +284,11 @@ with tab1:
 with tab2:
     st.header("OLS Regression Results")
     st.markdown(
-        "**Model:** `CGPA400 ~ Previous_GPA + Attendance_Rate + Study_Hours_Per_Week "
-        "+ Course_Load + Genotype_AS + Genotype_SS + Genotype_SS×Attendance`"
+        "**Model:** `CGPA400 ~ Previous_GPA + Trajectory_Slope_Prior + Attendance_Rate "
+        "+ Study_Hours_Per_Week + Course_Load + Genotype_AS + Genotype_SS "
+        "+ Genotype_SS×Attendance`  \n"
+        "*Trajectory_Slope_Prior* = OLS slope through CGPA100–300 only (excludes CGPA400). "
+        "*Trajectory_Slope* (four levels) is descriptive only — not used in scoring."
     )
 
     # ── Summary metrics ───────────────────────────────────────────────────────
@@ -660,7 +665,20 @@ with tab4:
             for w in soft_validate_predictors(Xs):
                 st.warning(w)
             pred = float(score_dataframe(model, Xs).iloc[0])
+            slope_prior = float(Xs["Trajectory_Slope_Prior"].iloc[0])
+            traj_class = classify_trajectory_prior(slope_prior)
             st.success(f"Predicted CGPA400: **{pred:.4f}** (0–5 scale)")
+            st.caption(
+                f"Prior trend: **Trajectory_Slope_Prior** = {slope_prior:.4f} "
+                f"({traj_class}; threshold ±0.05 GPA/level)."
+            )
+            decomp = prediction_decomposition(model, Xs)
+            st.subheader("Prediction breakdown")
+            st.dataframe(decomp, width="stretch", hide_index=True)
+            st.caption(
+                "Contributions are coefficient × value (illustrative OLS; L1, L3). "
+                "Sum of rows ≈ predicted CGPA400."
+            )
 
     else:
         up = st.file_uploader(

@@ -111,7 +111,7 @@ CIS/MIS/CEN/ICE are extrapolated from programme-tier ranking logic.
 
 ## §5. Verify.py Check Suite
 
-**Current check count:** 47 (includes trajectory schema, SS attendance < AA, CGPA400 correlations/regression, VIF split for SS interaction block)  
+**Current check count:** 52 (includes trajectory prior + four-level schema, SS attendance < AA, CGPA400 regression with Trajectory_Slope_Prior, VIF split for SS interaction block)  
 **Exit code 0:** all checks passed  
 **Exit code 1:** one or more failed  
 
@@ -119,13 +119,23 @@ Checks cover:
 1. Schema & Integrity (3 checks)
 2. Value Ranges (11 checks)
 2b. Genotype (4 checks)
-2c. Trajectory (2 checks)
+2c. Trajectory (5 checks — prior + four-level)
 3. Distributional Plausibility (7 checks)
 4. Correlation Structure (6 checks)
-5. Regression Readiness (14 checks — CGPA400 adj R², significance, VIF main effects + SS block)
+5. Regression Readiness (16 checks — CGPA400 adj R², Previous_GPA + Trajectory_Slope_Prior significance, VIF main effects + SS block)
 
 **Rule:** Checks may only be added, never removed or weakened. VIF on SS×Attendance uses an expected-inflation pass, not a <10 threshold.  
-**Last confirmed pass:** Senior review implementation, all 47 checks pass.
+**Last confirmed pass:** Trajectory scorer integration, all 52 checks pass.
+
+---
+
+## §8. Trajectory_Slope_Prior in OLS / Scorer
+
+**Decision:** Add `Trajectory_Slope_Prior` (OLS slope through CGPA100–300 only) to the OLS design matrix and Streamlit/`score.py` scorer.  
+**Reason:** Four-level `Trajectory_Slope` includes CGPA400 and must not predict CGPA400 (leakage). Prior-only slope captures momentum for forward prediction and aligns trajectory tab narrative with scoring.  
+**Observed (seed 42, deduped n=2974):** Adj R² ≈ 0.682; β(Trajectory_Slope_Prior) ≈ 0.448; OOF MAE ≈ 0.357.  
+**Scorer:** Derived from CGPA100–300 when provided; set to 0 with warning if only Previous_GPA supplied.  
+**Resolved by:** Trajectory scorer integration plan, May 2026.
 
 ---
 

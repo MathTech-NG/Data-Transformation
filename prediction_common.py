@@ -17,9 +17,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 
 DEFAULT_TARGET = "CGPA400"
+TRAJECTORY_PRIOR_THRESHOLD = 0.05
 
 CONTINUOUS_PREDICTORS = [
     "Previous_GPA",
+    "Trajectory_Slope_Prior",
     "Attendance_Rate",
     "Study_Hours_Per_Week",
     "Course_Load",
@@ -29,6 +31,7 @@ INTERACTION_COLS = ["Genotype_SS_x_Attendance"]
 DESIGN_COLUMNS = CONTINUOUS_PREDICTORS + GENOTYPE_DUMMY_COLS + INTERACTION_COLS
 COEF_LABELS = [
     "Previous_GPA",
+    "Trajectory_Slope_Prior",
     "Attendance_Rate",
     "Study_Hours_Per_Week",
     "Course_Load",
@@ -53,6 +56,29 @@ def load_enriched_deduped(path: str) -> pd.DataFrame:
 def derive_previous_gpa(df: pd.DataFrame) -> pd.Series:
     """Same definition as enrich.py: mean(CGPA100, CGPA200, CGPA300), rounded to 4 dp."""
     return ((df["CGPA100"] + df["CGPA200"] + df["CGPA300"]) / 3).round(4)
+
+
+def derive_trajectory_slope_prior(df: pd.DataFrame) -> pd.Series:
+    """
+    OLS slope of CGPA100–300 vs t = 1, 2, 3 (excludes CGPA400 — safe for predicting CGPA400).
+    Same definition as enrich.py Trajectory_Slope_Prior.
+    """
+    t = np.array([1.0, 2.0, 3.0])
+    t_mean = t.mean()
+    denom = float(np.sum((t - t_mean) ** 2))
+    y = df[LEVEL_FOR_PREVIOUS].astype(float).values
+    y_mean = y.mean(axis=1, keepdims=True)
+    num = np.sum((t - t_mean) * (y - y_mean), axis=1)
+    slopes = np.where(denom == 0, 0.0, num / denom)
+    return pd.Series(slopes, index=df.index).round(4)
+
+
+def classify_trajectory_prior(slope: float) -> str:
+    if slope > TRAJECTORY_PRIOR_THRESHOLD:
+        return "Improving"
+    if slope < -TRAJECTORY_PRIOR_THRESHOLD:
+        return "Declining"
+    return "Stable"
 
 
 def build_design_matrix(df: pd.DataFrame) -> pd.DataFrame:
@@ -145,7 +171,7 @@ def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
     used = (
         set(CONTINUOUS_PREDICTORS)
         | set(LEVEL_FOR_PREVIOUS)
-        | {"Genotype"}
+        | {"Genotype", "Trajectory_Class_Prior"}
         | set(GENOTYPE_DUMMY_COLS)
         | set(INTERACTION_COLS)
     )
@@ -187,6 +213,17 @@ def prepare_scoring_features(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
             "(plus behavioural columns and Genotype)."
         )
 
+    if has_levels:
+        out["Trajectory_Slope_Prior"] = derive_trajectory_slope_prior(out)
+    elif "Trajectory_Slope_Prior" in raw.columns:
+        out["Trajectory_Slope_Prior"] = raw["Trajectory_Slope_Prior"].astype(float)
+    else:
+        out["Trajectory_Slope_Prior"] = 0.0
+        msgs.append(
+            "Trajectory_Slope_Prior set to 0 (CGPA100–300 not provided); "
+            "prior trend is not applied to this score."
+        )
+
     return out[CONTINUOUS_PREDICTORS + ["Genotype"]].copy(), msgs
 
 
@@ -201,6 +238,8 @@ def soft_validate_predictors(df: pd.DataFrame) -> list[str]:
         w.append("Some Course_Load values are outside [8, 20].")
     if (df["Previous_GPA"] < 0).any() or (df["Previous_GPA"] > 5).any():
         w.append("Some Previous_GPA values are outside [0, 5].")
+    if (df["Trajectory_Slope_Prior"] < -1.5).any() or (df["Trajectory_Slope_Prior"] > 1.5).any():
+        w.append("Some Trajectory_Slope_Prior values are outside [-1.5, 1.5].")
     bad_gt = set(df["Genotype"].astype(str).unique()) - VALID_GENOTYPES
     if bad_gt:
         w.append(f"Invalid Genotype value(s): {sorted(bad_gt)}.")
@@ -213,10 +252,27 @@ def score_dataframe(model: Any, feature_rows: pd.DataFrame) -> pd.Series:
     return pd.Series(model.predict(X_const), name="predicted_CGPA400")
 
 
+def prediction_decomposition(model: Any, feature_rows: pd.DataFrame) -> pd.DataFrame:
+    """Per-term contribution (coefficient × value) for one or more scoring rows."""
+    X_const = sm.add_constant(build_design_matrix(feature_rows), has_constant="add")
+    rows = []
+    for i in range(len(feature_rows)):
+        aligned = X_const.iloc[i] * model.params
+        rows.append(
+            pd.DataFrame(
+                {"term": aligned.index, "contribution": aligned.values.round(4)},
+            )
+        )
+    if len(rows) == 1:
+        return rows[0]
+    return pd.concat(rows, keys=feature_rows.index, names=["row"])
+
+
 def print_limitation_banner() -> None:
     print(
         "\nNote (L1, L3, L7): Attendance and study hours are partly synthesized; "
         "genotype affects attendance via an assumed health pathway. "
         "Previous_GPA is arithmetically prior to CGPA400 (no overlap). "
+        "Trajectory_Slope_Prior uses CGPA100–300 only (not CGPA400). "
         "Metrics and scores are illustrative — not empirical proof of causation.\n"
     )

@@ -419,7 +419,8 @@
 			Observed & ID, programme, gender, YoG, CGPA, CGPA100--400, SGPA & From registrar records; no missing values. \\
 			Derived & Previous\_GPA & Mean of CGPA100, CGPA200, CGPA300 (lagged three-year average). \\
 			Synthesized & Attendance\_Rate, Study\_Hours\_Per\_Week, Course\_Load, Genotype & Not in source export; generated in \texttt{enrich.py}. \\
-			Derived (trajectory) & Trajectory\_Slope, Trajectory\_Class & Per-student OLS slope and class (Improving / Stable / Declining) across CGPA100--400. \\
+			Derived (trajectory) & Trajectory\_Slope\_Prior, Trajectory\_Class\_Prior & OLS slope across CGPA100--300 only; used in OLS/scorer (no CGPA400 leakage). \\
+			Derived (descriptive) & Trajectory\_Slope, Trajectory\_Class & Four-level slope across CGPA100--400; EDA and time-series tab only. \\
 			\hline
 		\end{tabularx}
 	\end{table}
@@ -427,7 +428,7 @@
 	Attendance, weekly study hours, course load, and haemoglobin genotype were absent from the historical export and could not be recovered retrospectively. They were synthesized under documented assumptions (Sections~\ref{sec:synthesis}--\ref{sec:genotype-synth}). CGPA and per-level GPAs are treated as observed administrative outcomes on MTU's 0--5 scale.
 	
 	\section{Data Preprocessing}
-	Preprocessing steps were: (i)~load the raw CSV without modification; (ii)~derive \textit{Previous\_GPA} and trajectory columns; (iii)~synthesize missing predictors (genotype before attendance, with genotype-conditioned attendance shifts); (iv)~run 47 automated checks in \texttt{verify.py} (exit code 0 required before modelling); (v)~for analysis notebooks and apps, drop duplicate \textit{ID No} rows where programme, gender, or graduation year conflict (70 collision IDs in the source---data-entry errors, not enrichment artefacts), retaining the first occurrence ($n = 2{,}974$ students for regression).
+	Preprocessing steps were: (i)~load the raw CSV without modification; (ii)~derive \textit{Previous\_GPA} and trajectory columns; (iii)~synthesize missing predictors (genotype before attendance, with genotype-conditioned attendance shifts); (iv)~run 52 automated checks in \texttt{verify.py} (exit code 0 required before modelling); (v)~for analysis notebooks and apps, drop duplicate \textit{ID No} rows where programme, gender, or graduation year conflict (70 collision IDs in the source---data-entry errors, not enrichment artefacts), retaining the first occurrence ($n = 2{,}974$ students for regression).
 	
 	No imputation of nulls was required in the source file. Variables were not normalized for OLS estimation; coefficients are reported on the original scales (percentage attendance, hours per week, integer course count, and genotype indicators).
 	
@@ -436,6 +437,8 @@
 	\textbf{Dependent variable:} CGPA400, the student's Level~400 (final-year) grade point average on the 0--5 scale. This removes arithmetic overlap with \textit{Previous\_GPA}, which uses only CGPA100--300.
 	
 	\textbf{Previous\_GPA:} $\text{Previous\_GPA} = (\text{CGPA100} + \text{CGPA200} + \text{CGPA300})/3$, rounded to four decimal places. This is the mean performance over the first three academic levels and is temporally prior to CGPA400.
+	
+	\textbf{Trajectory\_Slope\_Prior:} OLS slope of CGPA100--300 against $t = 1, 2, 3$ (GPA points per level). Used in Equation~(\ref{eq:full-model}) and the Streamlit scorer. The four-level \textit{Trajectory\_Slope} (including CGPA400) is retained for descriptive trajectory charts but is \textit{not} used to predict CGPA400, because it would leak the outcome.
 	
 	\textbf{Course\_Load:} Number of courses registered per semester (integer, range 8--20), programme-stratified; not credit units.
 	
@@ -462,15 +465,16 @@
 	\begin{equation}
 		\begin{split}
 			\text{CGPA400}_i ={} & \beta_0 + \beta_1 \text{Previous\_GPA}_i
-				+ \beta_2 \text{Attendance}_i + \beta_3 \text{StudyHours}_i \\
-			& + \beta_4 \text{CourseLoad}_i + \beta_5 D_{\text{AS},i}
-				+ \beta_6 D_{\text{SS},i} \\
-			& + \beta_7 \bigl(D_{\text{SS},i} \times \text{Attendance}_i\bigr)
+				+ \beta_2 \text{Trajectory\_Prior}_i
+				+ \beta_3 \text{Attendance}_i + \beta_4 \text{StudyHours}_i \\
+			& + \beta_5 \text{CourseLoad}_i + \beta_6 D_{\text{AS},i}
+				+ \beta_7 D_{\text{SS},i} \\
+			& + \beta_8 \bigl(D_{\text{SS},i} \times \text{Attendance}_i\bigr)
 				+ \varepsilon_i,
 		\end{split}
 		\label{eq:full-model}
 	\end{equation}
-	where $D_{\text{AS}}$ and $D_{\text{SS}}$ are one if genotype is AS or SS respectively, and zero otherwise (reference: AA). Equation~(\ref{eq:full-model}) extends the three-predictor specification in Chapter~1 with lagged academic history, course load, and a health-pathway interaction for SS students.
+	where $\text{Trajectory\_Prior}_i$ is the OLS slope through CGPA100--300 for student $i$, and $D_{\text{AS}}$, $D_{\text{SS}}$ are genotype indicators (reference: AA). Equation~(\ref{eq:full-model}) extends the three-predictor specification in Chapter~1 with lagged level, prior trajectory, course load, and a health-pathway interaction for SS students.
 	
 	OLS assumptions (linearity, independent errors, homoskedasticity, and approximate normality of residuals) were assessed graphically via residuals-versus-fitted, Q--Q, and scale-location plots (Chapter~4). VIF for continuous predictors and \texttt{Genotype\_AS} were below 10; VIF for \texttt{Genotype\_SS} and the SS$\times$attendance interaction are inflated by construction (collinear block) and are reported separately.
 	
@@ -480,7 +484,7 @@
 	\section{Predictive Validation and Scoring}
 	Out-of-sample performance was evaluated with $k$-fold cross-validation ($k = 5$, random seed 42): within each fold, OLS was fitted on the training partition and used to predict CGPA400 on the held-out partition; errors were stacked across folds. Reported metrics are mean absolute error (MAE), root mean squared error (RMSE), and out-of-fold $R^2$, compared to a baseline that always predicts the training-fold mean CGPA400. This is described as \textit{model fitting and out-of-sample validation}, not as a separate machine-learning training and testing pipeline.
 	
-	For operational forecasts, the same specification was refit on all deduplicated training rows; new input rows (CSV or JSON) supply attendance, study hours, course load, genotype, and either \textit{Previous\_GPA} or CGPA100--300 (from which \textit{Previous\_GPA} is computed). The tool writes a \texttt{predicted\_CGPA400} column. Arbitrary semester-level SGPA sequences without level CGPAs are outside the scope of this model.
+	For operational forecasts, the same specification was refit on all deduplicated training rows; new input rows (CSV or JSON) supply attendance, study hours, course load, genotype, and either \textit{Previous\_GPA} or CGPA100--300 (from which \textit{Previous\_GPA} and \textit{Trajectory\_Slope\_Prior} are computed). The Streamlit scorer reports a per-term prediction breakdown. Rows with only \textit{Previous\_GPA} and no level GPAs set prior slope to zero (trend not applied). Arbitrary semester-level SGPA sequences without level CGPAs are outside the scope of this model.
 	
 	\section{Software and Reproducibility}
 	Implementation used Python~3.9+ with \texttt{pandas}, \texttt{numpy}, \texttt{scipy}, \texttt{statsmodels} (primary estimation), \texttt{scikit-learn} (cross-validation splits and error metrics), \texttt{matplotlib}, \texttt{seaborn}, \texttt{plotly}, and \texttt{streamlit}. The Streamlit dashboard (\texttt{streamlit run app.py}) reproduces the exploratory, regression, trajectory, and cross-validation views shown in Chapter~4 and Appendix~A. Canonical commands: \texttt{python enrich.py}; \texttt{python verify.py}; \texttt{python predict.py}; \texttt{python score.py}; \texttt{jupyter notebook model.ipynb}; \texttt{streamlit run app.py}.
@@ -536,38 +540,38 @@
 	\end{figure}
 	
 	Despite this marginal bivariate correlation, \textit{Study\_Hours\_Per\_Week}
-	was not significant in the full OLS model ($\hat{\beta}_3 \approx 0.001$,
-	$p = 0.875$), consistent with the dominant influence of
-	\textit{Previous\_GPA} absorbing most of the explainable variance once
-	conditioning is applied.
+	was not significant in the full OLS model ($\hat{\beta}_4 \approx -0.0003$,
+	$p = 0.939$), consistent with prior GPA and trajectory terms absorbing
+	most explainable variance once conditioning is applied.
 	
 	\section{Regression Results}
-	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.646$. \textit{Previous\_GPA} has $\hat{\beta}_1 \approx 0.916$ ($p < 0.001$): a one-point increase in the three-year mean is associated with approximately a 0.92-point higher CGPA400, holding other predictors fixed. \textit{Attendance\_Rate} is positive and significant ($\hat{\beta}_2 \approx 0.005$, $p < 0.001$). Study hours, course load, genotype dummies, and the SS$\times$attendance interaction are not significant at $\alpha = 0.05$ in this sample, consistent with weak synthesis signal and small SS counts ($n_{\text{SS}} = 37$).
+	Table~\ref{tab:regression} reports OLS coefficients for Equation~(\ref{eq:full-model}). Adjusted $R^2 = 0.682$. \textit{Previous\_GPA} has $\hat{\beta}_1 \approx 0.851$ ($p < 0.001$): a one-point higher three-year mean is associated with approximately a 0.85-point higher CGPA400, holding other predictors fixed. \textit{Trajectory\_Slope\_Prior} has $\hat{\beta}_2 \approx 0.448$ ($p < 0.001$): a one GPA-point-per-level steeper prior trend is associated with approximately a 0.45-point higher CGPA400. \textit{Attendance\_Rate} remains positive and significant ($\hat{\beta}_3 \approx 0.005$, $p < 0.001$) but with a smaller marginal role once trajectory is included. Study hours, course load, genotype dummies, and the SS$\times$attendance interaction are not significant at $\alpha = 0.05$ ($n_{\text{SS}} = 37$).
 	
-	Figure~\ref{fig:ols-results} reproduces the Streamlit OLS tab for CGPA400: coefficient estimates with $p$-values and model fit statistics. Only \textit{Previous\_GPA} and \textit{Attendance\_Rate} are significant at $\alpha = 0.05$; genotype terms are not statistically significant in this illustrative specification (L3, L7). Coefficients on synthesized behavioural variables must not be read as causal effects (L1).
+	Figure~\ref{fig:ols-results} reproduces the Streamlit OLS tab for CGPA400 (re-capture after refit if coefficient table predates \textit{Trajectory\_Slope\_Prior}). \textit{Previous\_GPA}, \textit{Trajectory\_Slope\_Prior}, and \textit{Attendance\_Rate} are significant at $\alpha = 0.05$; genotype terms are not (L3, L7). Coefficients on synthesized behavioural variables must not be read as causal effects (L1).
 	
 	\begin{figure}[htbp]
 		\centering
 		\includegraphics[width=0.92\textwidth]{fig-4-3-ols-results.png}
-		\caption{OLS regression of CGPA400 ($n = 2{,}974$; adjusted $R^2 = 0.646$; $F = 776.5$). Green cells: $p < 0.05$. Genotype and study-hours terms are not significant (L3, L7). Results are illustrative under the synthesis assumptions (L1).}
+		\caption{OLS regression of CGPA400 ($n = 2{,}974$; adjusted $R^2 \approx 0.68$ after adding \textit{Trajectory\_Slope\_Prior}). Green cells: $p < 0.05$. Re-export from Streamlit if the table predates the trajectory predictor. Results are illustrative (L1).}
 		\label{fig:ols-results}
 	\end{figure}
 	
 	\begin{table}[htbp]
 		\centering
-		\caption{OLS regression of CGPA400 on predictors ($n = 2{,}974$; adjusted $R^2 = 0.646$)}
+		\caption{OLS regression of CGPA400 on predictors ($n = 2{,}974$; adjusted $R^2 = 0.682$)}
 		\label{tab:regression}
 		\begin{tabular}{lrrr}
 			\hline
 			Predictor & Coefficient & $p$-value & VIF \\
 			\hline
-			Previous\_GPA & 0.916 & $< 0.001$ & 1.13 \\
+			Previous\_GPA & 0.851 & $< 0.001$ & 1.22 \\
+			Trajectory\_Slope\_Prior & 0.448 & $< 0.001$ & 1.10 \\
 			Attendance\_Rate & 0.005 & $< 0.001$ & 1.10 \\
-			Study\_Hours\_Per\_Week & 0.001 & 0.875 & 1.07 \\
-			Course\_Load & $-0.001$ & 0.744 & 1.00 \\
-			Genotype (AS vs AA) & 0.016 & 0.447 & 1.02 \\
-			Genotype (SS vs AA) & 0.206 & 0.713 & $\approx 50$* \\
-			SS $\times$ Attendance & $-0.004$ & 0.671 & $\approx 50$* \\
+			Study\_Hours\_Per\_Week & $-0.0003$ & 0.939 & 1.07 \\
+			Course\_Load & $-0.006$ & 0.166 & 1.01 \\
+			Genotype (AS vs AA) & 0.009 & 0.658 & 1.02 \\
+			Genotype (SS vs AA) & 0.186 & 0.726 & $\approx 50$* \\
+			SS $\times$ Attendance & $-0.004$ & 0.615 & $\approx 50$* \\
 			\hline
 			\multicolumn{4}{l}{\footnotesize *Inflated VIF expected for SS block with interaction; main-effect VIF $< 10$.}
 		\end{tabular}
@@ -586,19 +590,19 @@
 	\end{figure}
 	
 	\section{In-Sample Fit}
-	The actual-versus-predicted CGPA400 scatter shows moderate scatter around the identity line (Adj $R^2 \approx 0.65$). This is a more honest fit than overall-CGPA models ($R^2 \approx 0.95$) and should not be cited as proof that attendance or genotype cause Level~400 outcomes (L1, L3, L7).
+	The actual-versus-predicted CGPA400 scatter shows moderate scatter around the identity line (Adj $R^2 \approx 0.68$). This is a more honest fit than overall-CGPA models ($R^2 \approx 0.95$) and should not be cited as proof that attendance or genotype cause Level~400 outcomes (L1, L3, L7).
 	
-	Figure~\ref{fig:actual-vs-predicted} plots observed CGPA400 against in-sample fitted values, coloured by programme. Points cluster around the identity line for mid-range GPAs with greater dispersion at the lower end. Fit quality is dominated by \textit{Previous\_GPA}; programme colour indicates heterogeneity across departments, not separate programme-specific models.
+	Figure~\ref{fig:actual-vs-predicted} plots observed CGPA400 against in-sample fitted values, coloured by programme. Points cluster around the identity line for mid-range GPAs with greater dispersion at the lower end. Fit quality is dominated by \textit{Previous\_GPA} and \textit{Trajectory\_Slope\_Prior}; programme colour indicates heterogeneity across departments, not separate programme-specific models.
 	
 	\begin{figure}[htbp]
 		\centering
 		\includegraphics[width=0.92\textwidth]{fig-4-5-actual-vs-predicted.png}
-		\caption{Actual versus predicted CGPA400 (adjusted $R^2 \approx 0.646$). Points coloured by programme code. Illustrative in-sample fit (L1); not a causal validation of behavioural or genotype predictors.}
+		\caption{Actual versus predicted CGPA400 (adjusted $R^2 \approx 0.682$). Points coloured by programme code. Illustrative in-sample fit (L1); not a causal validation of behavioural or genotype predictors.}
 		\label{fig:actual-vs-predicted}
 	\end{figure}
 	
 	\section{Out-of-Sample Predictive Performance}
-	Five-fold cross-validation (seed 42) yielded stacked out-of-fold MAE $= 0.378$, RMSE $= 0.478$, and $R^2 = 0.645$. The mean-only baseline achieved MAE $= 0.652$ and RMSE $= 0.802$. These metrics support the secondary predictive objective under the stated synthesis assumptions; they do not validate causal claims. The same metrics are reported interactively in the Streamlit \emph{Predict \& CV} tab (\texttt{streamlit run app.py}); a screenshot may be added to Appendix~A when captured.
+	Five-fold cross-validation (seed 42) yielded stacked out-of-fold MAE $= 0.357$, RMSE $= 0.453$, and $R^2 = 0.680$. The mean-only baseline achieved MAE $= 0.652$ and RMSE $= 0.802$. These metrics support the secondary predictive objective under the stated synthesis assumptions; they do not validate causal claims. The same metrics are reported interactively in the Streamlit \emph{Predict \& CV} tab (\texttt{streamlit run app.py}); a screenshot may be added to Appendix~A when captured.
 	
 	\section{Time-Series Analysis of Per-Level GPA}
 	Using observed CGPA100--CGPA400, mean GPA trajectories were computed by programme and graduation year. Per-student \textit{Trajectory\_Slope} and \textit{Trajectory\_Class} (Improving / Stable / Declining) classify 1,168, 564, and 1,242 students respectively at a $\pm 0.05$ slope threshold. An AR(1) panel model on stacked level transitions ($\text{GPA}_t \sim \text{GPA}_{t-1}$) yielded $\hat{\phi}_1 = 0.773$ ($R^2 = 0.553$), quantifying academic momentum. Kendall's $\tau$ on the four-point cohort mean series was $\tau = 0$ ($p = 1.0$), indicating no monotonic cohort trend across levels in this cross-section.
@@ -618,9 +622,9 @@
 	\section{Summary of Findings}
 	\begin{itemize}
 		\item Prior three-year academic performance (\textit{Previous\_GPA}) is the dominant linear predictor of CGPA400.
-		\item Reframing the DV to CGPA400 lowers adjusted $R^2$ from $\approx 0.95$ (CGPA) to $\approx 0.65$, a more honest range.
-		\item Synthesized attendance shows a weak positive association; other behavioural and genotype terms are illustrative in this sample.
-		\item Out-of-sample MAE $\approx 0.38$ on a 5-point scale; AR(1) momentum $\hat{\phi}_1 \approx 0.77$.
+		\item Reframing the DV to CGPA400 lowers adjusted $R^2$ from $\approx 0.95$ (CGPA) to $\approx 0.68$ with prior trajectory in the spec, a more honest range.
+		\item \textit{Trajectory\_Slope\_Prior} and \textit{Previous\_GPA} are the dominant predictors; synthesized attendance remains significant but secondary.
+		\item Out-of-sample MAE $\approx 0.36$ on a 5-point scale; AR(1) momentum $\hat{\phi}_1 \approx 0.77$.
 		\item Per-level trajectory and classification analyses characterize observed GPA progression.
 	\end{itemize}
 	
@@ -634,15 +638,15 @@
 	This chapter summarises the principal findings of the study, discusses their implications for institutional and methodological practice, acknowledges the limitations under which the results must be interpreted, and presents recommendations for future research. It draws together the regression, predictive validation, and time series analyses presented in Chapters~3 and~4 into a coherent closing account of what was achieved and what remains to be done.
 	
 	\section{Summary of Findings}
-	Prior academic performance (\textit{Previous\_GPA}, the mean of Level~100--300 GPAs) was the strongest linear predictor of Level~400 GPA (CGPA400), with coefficient $\hat{\beta}_1 = 0.916$ ($p < 0.001$). This confirms that academic momentum is the primary driver of final-year outcomes, consistent with the broader educational research literature on cumulative performance.
+	Prior academic performance (\textit{Previous\_GPA}, the mean of Level~100--300 GPAs) and prior trajectory (\textit{Trajectory\_Slope\_Prior}, the OLS slope through CGPA100--300) were the dominant linear predictors of Level~400 GPA (CGPA400), with $\hat{\beta}_1 = 0.851$ and $\hat{\beta}_2 = 0.448$ ($p < 0.001$ for both). Together they align the regression scorer with the time-series narrative: level and trend before final year, without using CGPA400 in the trajectory predictor.
 	
-	\textit{Attendance\_Rate} was the only behavioural variable to achieve statistical significance ($\hat{\beta}_2 = 0.005$, $p < 0.001$). While the effect size is small in absolute terms---a one percentage-point increase in attendance is associated with a 0.005-point increase in CGPA400---the finding is directionally consistent with the literature reviewed in Chapter~2 and supports the inclusion of attendance as a meaningful covariate. Study hours, course load, and genotype dummies were not significant at $\alpha = 0.05$, consistent with the weak synthesis signal and the small SS subsample ($n_{\text{SS}} = 37$ in the modelling sample).
+	\textit{Attendance\_Rate} remained statistically significant ($\hat{\beta}_3 = 0.005$, $p < 0.001$) but is secondary once trajectory is included. Study hours, course load, and genotype dummies were not significant at $\alpha = 0.05$, consistent with the weak synthesis signal and the small SS subsample ($n_{\text{SS}} = 37$ in the modelling sample).
 	
-	The decision to reframe the dependent variable from overall CGPA to CGPA400 reduced the adjusted $R^2$ from approximately 0.95 to 0.646, eliminating the arithmetic overlap between \textit{Previous\_GPA} and the outcome. Five-fold cross-validation yielded out-of-fold MAE $= 0.378$ and RMSE $= 0.478$ on a 0--5 scale, representing a 42\% reduction in mean absolute error relative to the naive baseline (MAE $= 0.652$). This is an honest and reproducible predictive result.
+	The decision to reframe the dependent variable from overall CGPA to CGPA400, and to add \textit{Trajectory\_Slope\_Prior}, yielded adjusted $R^2 = 0.682$ (versus $\approx 0.95$ for overlapping CGPA models). Five-fold cross-validation yielded out-of-fold MAE $= 0.357$ and RMSE $= 0.453$ on a 0--5 scale, representing a 45\% reduction in mean absolute error relative to the naive baseline (MAE $= 0.652$). This is an honest and reproducible predictive result.
 	
 	The AR(1) panel model fitted on stacked level-GPA transitions ($n = 8{,}922$ observations from 2,974 students) yielded an autoregressive coefficient $\hat{\phi}_1 = 0.773$ ($p < 0.001$, $R^2 = 0.553$). This quantifies academic momentum: a student performing one GPA point above the cohort mean in a given level is expected to perform approximately 0.77 points above the mean in the following level. The Mann-Kendall test on the cohort-mean level series found no monotonic trend ($\tau = 0$, $p = 1.0$), consistent with the observed non-linear pattern---a dip at Level~200 (mean GPA $= 3.322$) relative to Level~100 ($3.635$), followed by recovery at Level~300 ($3.421$) and Level~400 ($3.533$). Trajectory classification identified 1,168 improving students (39.3\%), 1,242 declining students (41.8\%), and 564 stable students (19.0\%) at a $\pm 0.05$ slope threshold.
 	
-	The health-pathway genotype inclusion---in which SS students were assigned a mean attendance penalty of 7.7 percentage points relative to AA students under the synthesis assumptions---produced the expected directional pattern in the data. The SS $\times$ Attendance interaction term ($\hat{\beta}_7 = -0.004$, $p = 0.671$) was not significant, which is attributed to the small SS subsample rather than absence of the pathway. This result is illustrative and consistent with the stated design intent; it does not constitute clinical evidence of a genotype effect on academic performance.
+	The health-pathway genotype inclusion---in which SS students were assigned a mean attendance penalty of 7.7 percentage points relative to AA students under the synthesis assumptions---produced the expected directional pattern in the data. The SS $\times$ Attendance interaction term ($\hat{\beta}_8 = -0.004$, $p = 0.615$) was not significant, which is attributed to the small SS subsample rather than absence of the pathway. This result is illustrative and consistent with the stated design intent; it does not constitute clinical evidence of a genotype effect on academic performance.
 	
 	\section{Implications of the Study}
 	The dominance of \textit{Previous\_GPA} as a predictor suggests that early identification of students with declining Level~100--200 trajectories could enable timely intervention before Level~400. The AR(1) coefficient of 0.773 means that academic underperformance is persistent but not deterministic: there is meaningful variance left unexplained, giving intervention programmes room to operate.

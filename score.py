@@ -4,8 +4,9 @@ score.py
 Operational CGPA400 predictions from the reference OLS fit on the full deduped
 enriched dataset (same specification as app.py / model.ipynb).
 
-Input rows must include Attendance_Rate, Study_Hours_Per_Week, Course_Load, and
-either Previous_GPA or (CGPA100, CGPA200, CGPA300).
+Input rows must include Attendance_Rate, Study_Hours_Per_Week, Course_Load, Genotype, and
+either Previous_GPA or (CGPA100, CGPA200, CGPA300). When level GPAs are supplied,
+Trajectory_Slope_Prior is derived automatically (CGPA100–300 slope; excludes CGPA400).
 
 Usage:
     python score.py --training academic_performance_enriched.csv \\
@@ -27,6 +28,7 @@ import pandas as pd
 from prediction_common import (
     fit_reference_ols,
     load_enriched_deduped,
+    prediction_decomposition,
     prepare_scoring_features,
     print_limitation_banner,
     score_dataframe,
@@ -84,8 +86,13 @@ def main() -> int:
 
     pred = score_dataframe(model, X)
     out = pd.concat([raw.reset_index(drop=True), pred.reset_index(drop=True)], axis=1)
+    if "Trajectory_Slope_Prior" in X.columns:
+        out["Trajectory_Slope_Prior"] = X["Trajectory_Slope_Prior"].values
     out.to_csv(args.output, index=False)
     print(f"Wrote {len(out)} row(s) with column 'predicted_CGPA400' → {args.output}")
+    if len(X) == 1:
+        print("\nPrediction breakdown (coefficient × value):")
+        print(prediction_decomposition(model, X).to_string(index=False))
     print(
         "Reminder: predicted values depend on synthesized predictors for training rows "
         "(L1, L3) and are not registrar-official forecasts."

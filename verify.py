@@ -50,7 +50,9 @@ def check_schema(df: pd.DataFrame) -> list[bool]:
         "CGPA", "Previous_GPA",
         "CGPA100", "CGPA200", "CGPA300", "CGPA400", "SGPA",
         "Attendance_Rate", "Study_Hours_Per_Week", "Course_Load",
-        "Genotype", "Trajectory_Slope", "Trajectory_Class",
+        "Genotype",
+        "Trajectory_Slope_Prior", "Trajectory_Class_Prior",
+        "Trajectory_Slope", "Trajectory_Class",
     }
     missing = required - set(df.columns)
     results.append(check(
@@ -174,6 +176,23 @@ def check_trajectory(df: pd.DataFrame) -> list[bool]:
         "Trajectory_Slope in plausible range [-1.0, 1.0]",
         df["Trajectory_Slope"].between(-1.0, 1.0).all(),
         f"min={df['Trajectory_Slope'].min():.3f}, max={df['Trajectory_Slope'].max():.3f}",
+    ))
+    prior_classes = {"Improving", "Stable", "Declining"}
+    observed_prior = set(df["Trajectory_Class_Prior"].astype(str).unique())
+    results.append(check(
+        "Trajectory_Class_Prior in {Improving, Stable, Declining}",
+        observed_prior <= prior_classes,
+        f"Unexpected: {observed_prior - prior_classes}" if not observed_prior <= prior_classes else "",
+    ))
+    results.append(check(
+        "Trajectory_Slope_Prior in plausible range [-1.5, 1.5]",
+        df["Trajectory_Slope_Prior"].between(-1.5, 1.5).all(),
+        f"min={df['Trajectory_Slope_Prior'].min():.3f}, max={df['Trajectory_Slope_Prior'].max():.3f}",
+    ))
+    results.append(check(
+        "Trajectory_Slope_Prior differs from Trajectory_Slope (4-level includes CGPA400)",
+        not np.allclose(df["Trajectory_Slope_Prior"], df["Trajectory_Slope"], atol=1e-6),
+        "At least some rows should differ — prior slope excludes Level 400",
     ))
     return results
 
@@ -317,7 +336,7 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
         "Honest range without CGPA arithmetic overlap",
     ))
 
-    significant = ["Previous_GPA"]
+    significant = ["Previous_GPA", "Trajectory_Slope_Prior"]
     informational = ["Attendance_Rate", "Study_Hours_Per_Week"]
     for i, var in enumerate(predictors):
         p = p_vals[i + 1]
@@ -349,6 +368,7 @@ def check_regression_readiness(df: pd.DataFrame, alpha: float) -> list[bool]:
     # VIF — main effects only; SS dummy + interaction are collinear by construction
     vif_main = [
         "Previous_GPA",
+        "Trajectory_Slope_Prior",
         "Attendance_Rate",
         "Study_Hours_Per_Week",
         "Course_Load",

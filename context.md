@@ -10,7 +10,7 @@ It is the first thing an agent should read after AGENTS.md.
 
 **Pipeline status:** STABLE — all 47 verify.py checks pass  
 **Active branch of work:** Senior-review fixes (CGPA400 DV, genotype→attendance pathway, SS×Attendance interaction, formal time series in notebook).  
-**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 17 columns (includes `Genotype`, `Trajectory_Slope`, `Trajectory_Class`)  
+**Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 19 columns (includes `Trajectory_Slope_Prior`, `Trajectory_Class_Prior`, four-level `Trajectory_Slope` / `Trajectory_Class` for EDA)  
 
 ### Dataset summary
 

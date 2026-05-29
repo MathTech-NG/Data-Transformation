@@ -25,6 +25,10 @@ Capture screenshots from each tab, then save under `img/` using the `fig-4-*` an
 
 Optional: add `fig-A-8-predict-cv.png` from the **Predict & CV** tab (see Appendix A, Section on out-of-sample metrics).
 
+## Scorer and trajectory
+
+The OLS scorer uses `Trajectory_Slope_Prior` (CGPA100–300 only). Re-capture OLS tab screenshots after refit if the coefficient table does not list this predictor.
+
 ## Build PDF
 
 From this directory (`docs/PROJECT-MAIN/`), with a LaTeX distribution installed:
