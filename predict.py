@@ -2,8 +2,8 @@
 predict.py
 ──────────────────────────────────────────────────────────────────────────────
 K-fold out-of-sample evaluation for the OLS specification predicting CGPA400:
-    CGPA400 ~ Previous_GPA + Attendance + Study_Hours + Course_Load
-              + Genotype dummies + Genotype_SS x Attendance
+    CGPA400 ~ Previous_GPA + Trajectory_Slope_Prior + Attendance + Study_Hours
+              + Course_Load + Genotype dummies + Genotype_SS x Attendance
 
 Optional legacy metrics for overall CGPA (--also-cgpa).
 

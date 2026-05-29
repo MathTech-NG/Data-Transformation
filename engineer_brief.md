@@ -563,6 +563,21 @@ the following documentation sections must be updated before supervisor submissio
 
 ---
 
+## Addendum — Trajectory_Slope_Prior in OLS / Scorer (May 2026)
+
+**Problem:** Four-level `Trajectory_Slope` includes CGPA400 → cannot predict CGPA400 without leakage.
+
+**Fix:** Add `Trajectory_Slope_Prior` (OLS slope through CGPA100–300 only) to `enrich.py`,
+`prediction_common.py` design matrix, `app.py` scorer, and `score.py`.
+
+**Keep:** Four-level `Trajectory_Slope` / `Trajectory_Class` for EDA and Trajectory tab only.
+
+**Observed (seed 42, n=2974):** Adj R² ≈ 0.682; β(Trajectory_Slope_Prior) ≈ 0.448; OOF MAE ≈ 0.357.
+
+**verify.py:** 52 checks (prior slope schema, VIF, significance).
+
+---
+
 *Brief prepared for internal use. All changes use fixed random seed 42
 for full reproducibility. Re-run `python enrich.py && python verify.py`
 after each change to confirm pipeline integrity before proceeding to

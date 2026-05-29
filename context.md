@@ -6,37 +6,39 @@ It is the first thing an agent should read after AGENTS.md.
 
 ---
 
-## Current State (as of Senior Review implementation)
+## Current State (as of Trajectory scorer integration, May 2026)
 
-**Pipeline status:** STABLE — all 47 verify.py checks pass  
-**Active branch of work:** Senior-review fixes (CGPA400 DV, genotype→attendance pathway, SS×Attendance interaction, formal time series in notebook).  
+**Pipeline status:** STABLE — all 52 verify.py checks pass  
+**Active branch of work:** Trajectory_Slope_Prior in OLS/scorer; thesis figure integration; documentation sync.  
 **Enriched dataset:** `academic_performance_enriched.csv` — 3,046 rows × 19 columns (includes `Trajectory_Slope_Prior`, `Trajectory_Class_Prior`, four-level `Trajectory_Slope` / `Trajectory_Class` for EDA)  
 
 ### Dataset summary
 
 | Variable | Type | Source | Key stat |
 |---|---|---|---|
-| CGPA | float | Original | mean=3.56, std=0.62, range [1.46, 4.93] |
-| Previous_GPA | float | Derived | mean(CGPA100,200,300), r(CGPA)=0.976 |
-| Attendance_Rate | float | Synthesized | r(CGPA)=0.28, range [40, 100] |
-| Study_Hours_Per_Week | float | Synthesized | r(CGPA)=0.24, range [2, 20] |
-| Course_Load | int | Synthesized | r(CGPA)=-0.03, range [8, 20] |
+| CGPA | float | Original | mean≈3.56, std≈0.62 |
+| Previous_GPA | float | Derived | mean(CGPA100,200,300); no overlap with CGPA400 |
+| Trajectory_Slope_Prior | float | Derived | OLS slope CGPA100–300; used in OLS/scorer |
+| Trajectory_Slope | float | Derived | Four-level slope incl. CGPA400; EDA only |
+| Attendance_Rate | float | Synthesized | r(CGPA)≈0.28, range [40, 100] |
+| Study_Hours_Per_Week | float | Synthesized | r(CGPA)≈0.24, range [2, 20] |
+| Course_Load | int | Synthesized | r(CGPA)≈−0.03, range [8, 20] |
 | CGPA100–400 | float | Original | per-level GPA, all in [0, 5] |
-| SGPA | float | Original | semester GPA |
 
-### OLS snapshot (CGPA400 ~ 7 predictors; primary model)
+### OLS snapshot (CGPA400; 8 predictors incl. genotype block)
 
-| Predictor | r(CGPA400) | p-value (OLS) | VIF (main effects) |
+| Predictor | Coef (approx.) | p-value (OLS) | VIF (main effects) |
 |---|---|---|---|
-| Previous_GPA | ~0.80 | < 0.001 | 1.13 |
-| Attendance_Rate | ~0.28 | < 0.001 | 1.10 |
-| Study_Hours_Per_Week | ~0.24 | varies | 1.07 |
-| Course_Load | ~-0.03 | varies | 1.00 |
-| Genotype_SS × Attendance | — | may be NS | inflated (expected) |
-| **Adj R²** | | **~0.65** | |
+| Previous_GPA | 0.851 | < 0.001 | 1.22 |
+| Trajectory_Slope_Prior | 0.448 | < 0.001 | 1.10 |
+| Attendance_Rate | 0.005 | < 0.001 | 1.10 |
+| Study_Hours_Per_Week | −0.0003 | 0.939 | 1.07 |
+| Course_Load | −0.006 | 0.166 | 1.01 |
+| Genotype / SS×Attendance | — | NS | SS block inflated (expected) |
+| **Adj R²** | **0.682** | | |
+| **OOF MAE / RMSE / R²** (5-fold) | **0.357 / 0.453 / 0.680** | | |
 
-Note: Overall CGPA models still show r(Previous_GPA, CGPA) ≈ 0.976 (legacy overlap).
-Primary DV is CGPA400 — see memory.md §3 and engineer_brief.md.
+Note: Four-level `Trajectory_Slope` must not be used to predict CGPA400 (leakage). Scorer derives `Trajectory_Slope_Prior` from CGPA100–300 when levels are supplied.
 
 ---
 
@@ -45,8 +47,8 @@ Primary DV is CGPA400 — see memory.md §3 and engineer_brief.md.
 ### OQ-1 — Reframe dependent variable as CGPA400?
 **Status:** Resolved (senior review, May 2026)  
 **Decision:** Primary DV is **CGPA400** across `prediction_common.py`, `predict.py`, `score.py`, `app.py`, `verify.py`, and `model.ipynb`. Overall CGPA metrics remain optional for comparison.  
-**Observed Adj R²:** ~0.65 (honest range vs ~0.95 on CGPA). OOF MAE ≈ 0.38, R² ≈ 0.64.  
-**Agent instruction:** Do not revert to CGPA as default DV without explicit human instruction.
+**Observed Adj R²:** ~0.682 (honest range vs ~0.95 on CGPA). OOF MAE ≈ 0.357, RMSE ≈ 0.453, R² ≈ 0.680.  
+**Trajectory in scorer:** `Trajectory_Slope_Prior` (CGPA100–300 only) in OLS design matrix — see memory.md §8.
 
 ### OQ-2 — Pooled model vs. per-programme-tier models?
 **Status:** Open  
@@ -84,15 +86,18 @@ discussing predictor selection.
 - [x] v2 synthesis implemented (blended model, lagged Previous_GPA)
 - [x] Course_Load corrected from credit units to course count
 - [x] Course count range calibrated against verified MTU transcript
-- [x] verify.py 34-check suite passing
-- [x] README.md with full methodology and honest limitations (L1–L6)
+- [x] verify.py 52-check suite passing (includes Trajectory_Slope_Prior)
+- [x] README.md with full methodology and honest limitations (L1–L7)
 - [x] AGENTS.md, memory.md, context.md, init.sh created
-- [x] Prediction layer: `prediction_common.py`, `predict.py`, `score.py`, notebook §3.6, Streamlit Predict & CV tab
+- [x] Prediction layer: `prediction_common.py`, `predict.py`, `score.py`, Streamlit Predict & CV tab with breakdown
+- [x] CGPA400 primary DV; genotype pathway; SS×Attendance interaction
+- [x] Trajectory_Slope_Prior in enrich.py, OLS, scorer (May 2026)
+- [x] Canonical thesis in `docs/PROJECT-MAIN/` with Ch4 figures (PNG refresh pending for OLS tab)
 
 ## Next Steps
 
-- [ ] Resolve OQ-1 (DV reframe) with Kelvin and supervisor
-- [ ] Build time-series modelling script (per-student CGPA trajectory) if still required beyond notebook
-- [ ] Generate descriptive statistics table for paper methodology section
-- [ ] Write methodology section language citing L1–L6 limitations explicitly
-- [x] Out-of-sample CV (`predict.py`) and batch scoring (`score.py`) with README + notebook Section 3.6
+- [ ] Re-capture Streamlit PNGs (`fig-4-3`–`fig-4-5`, optional `fig-A-8`) after `streamlit run app.py`
+- [ ] Compile thesis PDF locally (`docs/PROJECT-MAIN/README.md`)
+- [ ] Resolve OQ-2 / OQ-3 / OQ-4 with supervisor (pooled models, overload rate, SGPA)
+- [x] Out-of-sample CV (`predict.py`) and batch scoring (`score.py`)
+- [x] OQ-1 resolved: CGPA400 default DV

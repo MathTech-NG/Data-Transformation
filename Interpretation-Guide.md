@@ -3,135 +3,96 @@
 **Project:** Regression and Time Series Modelling of Students' Performance Across Semester  
 **Dataset:** `academic_performance_enriched.csv` — Mountain Top University, Jan 2026
 
-This guide walks through every output in the OLS Results and Trajectory Charts tabs, using the
-actual numbers from this model. No generic theory — everything is tied directly to what you see
-on screen.
+This guide walks through OLS Results, Predict & CV (scorer), and Trajectory Charts tabs, tied to
+the **CGPA400 + Trajectory_Slope_Prior** model (Adj R² ≈ 0.68). Re-capture Streamlit screenshots
+after refit if the UI still shows the old coefficient table.
 
 ---
 
-## Part 1 — The OLS Regression Results
+## Part 1 — The OLS Regression Results (CGPA400)
+
+**Primary dependent variable:** `CGPA400` (Level 400 GPA), not overall CGPA.  
+**Primary predictors for academic history:** `Previous_GPA` (mean of CGPA100–300) and `Trajectory_Slope_Prior` (OLS slope through CGPA100–300 only). The four-level `Trajectory_Slope` (includes CGPA400) appears only in the Trajectory tab — never in the scorer.
 
 ### 1.1 What the three headline metrics mean
 
 | Metric | This model's value | What it tells you |
 |---|---|---|
-| **Adj R²** | 0.9530 | 95.3% of the variation in CGPA is explained by the four predictors *together* |
-| **F-statistic** | ~15,000 | The model as a whole is statistically significant (all coefficients are not simultaneously zero) |
-| **N observations** | ~2,976 | The number of students used after dropping duplicate ID rows |
+| **Adj R²** | ~0.682 | About 68% of variation in **CGPA400** is explained by the predictors together (honest range; no CGPA400 overlap with Previous_GPA) |
+| **F-statistic** | large | The model as a whole is statistically significant |
+| **N observations** | 2,974 | Students after dropping duplicate ID rows |
 
-**Adjusted R²** is the one that matters most for model evaluation. It penalises you for adding
-extra predictors that do not help — unlike plain R², it does not automatically rise just because
-you added more variables. A value of 0.953 sounds excellent. However, see Section 1.4 for why
-you should be cautious about celebrating it here.
+Legacy models using overall **CGPA** as the DV can show Adj R² ≈ 0.95 — that is mostly arithmetic overlap (L2), not a better model.
 
 ---
 
 ### 1.2 How to read the Coefficient Table
 
-Here is what each column means using this model's output as the example:
+Approximate values from the current refit (seed 42, deduped sample):
 
-| Variable | Coefficient | Std Error | t-statistic | p-value | CI Lower | CI Upper |
-|---|---|---|---|---|---|---|
-| const | small negative | small | large \|t\| | < 0.001 | — | — |
-| Previous_GPA | **≈ 0.95–1.00** | very small | very large | < 0.001 | — | — |
-| Attendance_Rate | **≈ 0.003–0.005** | small | moderate | < 0.001 | — | — |
-| Study_Hours_Per_Week | **≈ 0.004–0.006** | small | moderate | < 0.001 | — | — |
-| Course_Load | **≈ −0.002–0.002** | very small | near zero | ≈ 0.016 | — | — |
+| Variable | Coefficient | p-value | Practical reading |
+|---|---|---|---|
+| Previous_GPA | **≈ 0.85** | < 0.001 | Higher three-year mean → higher CGPA400 |
+| Trajectory_Slope_Prior | **≈ 0.45** | < 0.001 | Steeper improving trend (GPA/level) → higher CGPA400 |
+| Attendance_Rate | **≈ 0.005** | < 0.001 | +1% attendance → +0.005 CGPA400 (small; partly synthetic — L1, L3) |
+| Study_Hours_Per_Week | **≈ 0** | NS | Not significant once trajectory is included |
+| Course_Load / Genotype block | near zero | mostly NS | Illustrative only (L3, L7) |
 
 #### Coefficient (the slope)
 
-The coefficient tells you: *holding all other predictors constant, by how much does CGPA change
-for a one-unit increase in this variable?*
-
-- **Previous_GPA ≈ 0.97:** A student with a one-point higher three-year average (e.g. 3.5 vs
-  2.5) is predicted to have a CGPA about 0.97 points higher. This dominates the model.
-- **Attendance_Rate ≈ 0.004:** A student who attends 10% more classes is predicted to have a
-  CGPA only 0.04 higher (10 × 0.004). This is a tiny effect in practical terms.
-- **Study_Hours_Per_Week ≈ 0.005:** One extra hour of study per week predicts a 0.005 CGPA
-  increase. Again, a very small practical effect.
-- **Course_Load ≈ −0.002:** Taking one more course predicts a negligible CGPA change.
-
-#### Standard Error
-
-How uncertain we are about each coefficient estimate. A small standard error means the estimate
-is precise. The very small SE on `Previous_GPA` reflects that it is measured exactly (it is a
-computed mean, not a survey response).
-
-#### t-statistic
-
-`t = Coefficient / Standard Error`. The larger the absolute value, the stronger the evidence
-that the true coefficient is not zero. A rule of thumb: |t| > 2 is significant at the 5% level
-for large samples.
+- **Previous_GPA ≈ 0.85:** Level of performance over Years 1–3.
+- **Trajectory_Slope_Prior ≈ 0.45:** *Direction* of performance (improving vs declining) before Level 400. An improving student (e.g. 3.4 → 4.4 → 4.5) gets a higher score than a flat student at the same mean.
+- **Attendance_Rate ≈ 0.005:** Statistically significant but small; do not treat as proof that attendance *causes* outcomes (L1).
 
 #### p-value
 
-The probability of observing a t-statistic this large *if the true coefficient were zero*.
-
-- **p < 0.001** (green in the app): Very strong evidence the predictor matters.
-- **p < 0.05** (yellow): Moderate evidence.
-- **p ≥ 0.05** (red): Insufficient evidence at conventional thresholds.
-
-All four predictors are significant here. That means the regression can distinguish their effects
-from zero — but it does **not** mean the effects are large or meaningful. Significance is about
-precision, not importance.
-
-#### 95% Confidence Interval
-
-The range within which the true coefficient falls with 95% probability (under frequentist
-assumptions). If the interval does not cross zero, the predictor is significant at α = 0.05.
-For `Previous_GPA` the interval is narrow and far from zero. For `Course_Load` the interval
-is very narrow and straddles near-zero — significant only because the sample is large.
+Green (p < 0.05) means distinguishable from zero in this sample — not necessarily large or causal.
 
 ---
 
 ### 1.3 How to read the Coefficient Bar Chart
 
-The bars show the magnitude of each coefficient. Error bars show ± 1.96 standard errors
-(approximately the 95% CI).
-
-**What to look for:**
-
-- **Bar length** = how much a one-unit change in that predictor moves predicted CGPA.
-- **Error bar width** = uncertainty. A very long error bar means imprecise estimation.
-- **Bar crossing zero** = predictor is not distinguishable from no effect.
-
-In this chart you will see `Previous_GPA` has a bar roughly 100–200× longer than the
-behavioural variables. That single visual tells you the whole story of the model: one variable
-is doing nearly all the work.
+`Previous_GPA` and `Trajectory_Slope_Prior` have the longest bars. Behavioural variables are much smaller. Genotype SS terms may show very wide error bars (small n_SS).
 
 ---
 
-### 1.4 The critical caveat — why you should not over-interpret this R²
+### 1.4 Why this R² is more honest than the old CGPA model
 
-`Previous_GPA = mean(CGPA100, CGPA200, CGPA300)`
+**Primary DV = CGPA400.** `Previous_GPA` uses only CGPA100–300 — **no shared components** with the outcome (L2 resolved for this spec).
 
-The final `CGPA` is approximately `mean(CGPA100, CGPA200, CGPA300, CGPA400)`.
+**Trajectory_Slope_Prior** adds momentum without leaking CGPA400 into the predictor (unlike four-level `Trajectory_Slope`).
 
-So `Previous_GPA` contains **three of the four components** that make up `CGPA`. When you
-regress something on part of itself, you will always get a high R² — not because your model is
-insightful, but because of algebra. This is **Limitation L2**.
+Adj R² ≈ 0.68 is lower than legacy CGPA models (~0.95) but reflects a genuine prediction problem: *given Years 1–3 and profile, what is Level 400 GPA?*
 
-A more honest test of whether attendance and study hours *explain* anything would be to either:
+---
 
-1. Remove `Previous_GPA` and run the model on the behavioural variables alone — the R² will
-   drop to around 0.10–0.15, which is more truthful.
-2. Reframe the dependent variable as `CGPA400` only (Level 400 performance), keeping
-   `Previous_GPA = mean(CGPA100, CGPA200, CGPA300)`. Under this framing the two variables no
-   longer share any components, and the R² will reflect genuine predictive content.
+## Part 1b — Predict & CV tab (scorer)
+
+When you enter **CGPA100 / 200 / 300**, the app computes:
+
+- `Previous_GPA` = mean of the three levels  
+- `Trajectory_Slope_Prior` = OLS slope through those three points  
+- `Trajectory_Class_Prior` = Improving / Stable / Declining (±0.05 GPA per level)
+
+The **prediction breakdown** table shows each term as coefficient × value. Sum ≈ predicted CGPA400.
+
+**If you enter only Previous_GPA** (no levels), prior slope is set to **0** and a message warns that trend is not applied.
+
+**Do not** crank attendance to 100% and interpret a high score as “effort replaces studying” — attendance is partly synthesized and secondary to prior GPA + trajectory (L1, L3).
 
 ---
 
 ## Part 2 — Residual Diagnostics (the 2×2 plot)
 
 Residuals are the differences between what the model predicted and what actually happened:
-`residual = actual CGPA − predicted CGPA`. If the model is well-specified, residuals should
+`residual = actual CGPA400 − predicted CGPA400`. If the model is well-specified, residuals should
 behave like random noise — no patterns, approximately normal, consistent variance.
 
 ---
 
 ### 2.1 Residuals vs Fitted (top-left)
 
-**What you are looking at:** Each dot is one student. X-axis = predicted CGPA, Y-axis =
+**What you are looking at:** Each dot is one student. X-axis = predicted CGPA400, Y-axis =
 prediction error.
 
 **What good looks like:** A horizontal cloud of points scattered evenly around the y = 0 line,
@@ -200,7 +161,7 @@ predicted values have larger errors — heteroskedasticity.
 
 ### 2.5 Actual vs Predicted Scatter
 
-**What you are looking at:** Each dot is one student. X = predicted CGPA, Y = actual CGPA.
+**What you are looking at:** Each dot is one student. X = predicted CGPA400, Y = actual CGPA400.
 The dashed line is the 45° identity line (perfect prediction would put every dot on it).
 
 **What good looks like:** Points clustered tightly around the identity line.

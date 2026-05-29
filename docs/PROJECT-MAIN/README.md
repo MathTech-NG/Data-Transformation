@@ -25,9 +25,19 @@ Capture screenshots from each tab, then save under `img/` using the `fig-4-*` an
 
 Optional: add `fig-A-8-predict-cv.png` from the **Predict & CV** tab (see Appendix A, Section on out-of-sample metrics).
 
-## Scorer and trajectory
+### Screenshots to refresh (model includes Trajectory_Slope_Prior)
 
-The OLS scorer uses `Trajectory_Slope_Prior` (CGPA100–300 only). Re-capture OLS tab screenshots after refit if the coefficient table does not list this predictor.
+These PNGs may still show the pre-trajectory OLS table until you re-export from a running app:
+
+| Priority | File | Why |
+|----------|------|-----|
+| High | `fig-4-3-ols-results.png` | Must show Trajectory_Slope_Prior row |
+| High | `fig-4-4-residual-diagnostics.png` | Residuals from updated fit |
+| High | `fig-4-5-actual-vs-predicted.png` | Adj R² ≈ 0.68 |
+| Medium | `fig-A-5-ols-coefficients-ci.png` | CI plot includes new term |
+| New | `fig-A-8-predict-cv.png` | OOF metrics + scorer breakdown (optional) |
+
+Data Overview and correlation figures are still valid; trajectory heatmaps unchanged.
 
 ## Build PDF
 

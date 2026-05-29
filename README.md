@@ -156,8 +156,12 @@ After running `enrich.py` the dataset has 15 columns:
 ### Regression model
 
 ```
-CGPA ~ Previous_GPA + Attendance_Rate + Study_Hours_Per_Week + Course_Load + Genotype (dummies)
+CGPA400 ~ Previous_GPA + Trajectory_Slope_Prior + Attendance_Rate
+        + Study_Hours_Per_Week + Course_Load + Genotype (dummies) + SS×Attendance
 ```
+
+`Trajectory_Slope_Prior` = OLS slope through CGPA100–300 only (scorer-safe).  
+Four-level `Trajectory_Slope` (includes CGPA400) is for EDA only — not a scorer input.
 
 Fitted using OLS (`statsmodels`). All synthesis is seeded (default `--seed 42`) for full
 reproducibility.
@@ -278,8 +282,8 @@ carry no clinical weight.
 |---|---|
 | [docs/PROJECT-MAIN/](docs/PROJECT-MAIN/) | **Canonical thesis** (`regression_time_series_students_performance.tex`), BibTeX, and Streamlit figure assets in `img/` (`fig-4-*`, `fig-A-*`). Build with `pdflatex` + `bibtex` from that folder; figures from `streamlit run app.py`. |
 | [VARIABLE-SYNTHESIS.md](VARIABLE-SYNTHESIS.md) | Full synthesis methodology, mathematical proofs, programme parameters, version history |
-| [Interpretation-Guide.md](Interpretation-Guide.md) | How to read every chart and table produced by the analysis |
-| [Talking-Points.md](Talking-Points.md) | Verbal presentation guide for the results |
+| [Interpretation-Guide.md](Interpretation-Guide.md) | How to read OLS, Predict & CV scorer, and trajectory charts (CGPA400 model) |
+| [Talking-Points.md](Talking-Points.md) | Verbal presentation guide for viva / supervisor discussion |
 
 ---
 

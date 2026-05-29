@@ -122,12 +122,12 @@
 		{\Large{\bf Abstract}}
 	\end{center}
 	
-	\noindent This study develops and evaluates a predictive model for students' academic performance at Mountain Top University using mathematical modelling, ordinary least squares (OLS) regression, and time series analysis on per-level GPA. The primary outcome is Level~400 GPA (CGPA400), predicted from lagged three-year performance (\textit{Previous\_GPA}), synthesized attendance and study hours, course load, haemoglobin genotype, and a health-pathway interaction for SS students. Registrar data for 3,046 graduates (2010--2014) are enriched with documented synthesis where behavioural and genotype fields were absent from the historical export.
+	\noindent This study develops and evaluates a predictive model for students' academic performance at Mountain Top University using mathematical modelling, ordinary least squares (OLS) regression, and time series analysis on per-level GPA. The primary outcome is Level~400 GPA (CGPA400), predicted from lagged three-year performance (\textit{Previous\_GPA}), prior academic trajectory (\textit{Trajectory\_Slope\_Prior}, OLS slope through CGPA100--300 only), synthesized attendance and study hours, course load, haemoglobin genotype, and a health-pathway interaction for SS students. Registrar data for 3,046 graduates (2010--2014) are enriched with documented synthesis where behavioural and genotype fields were absent from the historical export.
 	
-	A reproducible Python pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{predict.py}) prepares the dataset, runs 47 integrity checks, and reports five-fold cross-validated error on CGPA400 (MAE $= 0.378$, adjusted in-sample $R^2 \approx 0.65$). Time series components include per-student trajectory slopes, an AR(1) panel on level-to-level GPA transitions ($\hat{\phi}_1 = 0.773$), and a Kendall trend test on cohort mean GPA across Levels 100--400. Results are illustrative under stated synthesis assumptions (L1--L7) and are not presented as causal proof from observed attendance or clinical genotype records.
+	A reproducible Python pipeline (\texttt{enrich.py}, \texttt{verify.py}, \texttt{predict.py}, \texttt{score.py}, \texttt{app.py}) prepares the dataset, runs 52 integrity checks, and reports five-fold cross-validated error on CGPA400 (MAE $= 0.357$, RMSE $= 0.453$, out-of-fold $R^2 = 0.680$; adjusted in-sample $R^2 = 0.682$). Time series components include four-level descriptive trajectory slopes, prior-only slopes used in the scorer, an AR(1) panel on level-to-level GPA transitions ($\hat{\phi}_1 = 0.773$), and a Kendall trend test on cohort mean GPA across Levels 100--400. Results are illustrative under stated synthesis assumptions (L1--L7) and are not presented as causal proof from observed attendance or clinical genotype records.
 	
 	\vspace{1em}
-	\noindent \textbf{Keywords:} Academic performance, CGPA400, time series analysis, OLS regression, predictive modelling, attendance, study hours, genotype, trajectory classification, AR(1), Mountain Top University, educational data analysis.
+	\noindent \textbf{Keywords:} Academic performance, CGPA400, Trajectory\_Slope\_Prior, time series analysis, OLS regression, predictive modelling, attendance, study hours, genotype, trajectory classification, AR(1), Mountain Top University, educational data analysis.
 
 	\newpage
 	\tableofcontents
@@ -734,7 +734,7 @@
 	
 	\section{Out-of-Sample Metrics in the Dashboard}
 	\label{sec:oof-cv-note}
-	Five-fold cross-validation metrics (MAE $= 0.378$, RMSE $= 0.478$, out-of-fold $R^2 = 0.645$) are reported in text in Section~4.6 and interactively under the Streamlit \emph{Predict \& CV} tab. To include a figure, capture a screenshot after \texttt{streamlit run app.py} and add \texttt{fig-A-8-predict-cv.png} to \texttt{docs/PROJECT-MAIN/img/}.
+	Five-fold cross-validation metrics (MAE $= 0.357$, RMSE $= 0.453$, out-of-fold $R^2 = 0.680$) are reported in text in Section~4.6 and interactively under the Streamlit \emph{Predict \& CV} tab. To include a figure, capture a screenshot after \texttt{streamlit run app.py} and add \texttt{fig-A-8-predict-cv.png} to \texttt{docs/PROJECT-MAIN/img/}.
 	
 	\newpage
 	\bibliographystyle{plainnat}
